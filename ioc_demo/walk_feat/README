@@ -1,0 +1,49 @@
+Preprocessed feature maps
+* Values are normalized from 0 to -1
+
+Format OpenCV XML
+*Header contains feature name ('feature_XX') and size info
+*You can parse it or use OpenCV to load it
+
+Each XML file contains 40 features listed below:
+
+[feature_0] constant
+[feature_1] pavement
+[feature_2] pavement_dist0
+[feature_3] pavement_dist1
+[feature_4] pavement_dist2
+[feature_5] sidewalk
+[feature_6] sidewalk_dist0
+[feature_7] sidewalk_dist1
+[feature_8] sidewalk_dist2
+[feature_9] person
+[feature_10] person_dist0
+[feature_11] person_dist1
+[feature_12] person_dist2
+[feature_13] car
+[feature_14] car_dist0
+[feature_15] car_dist1
+[feature_16] car_dist2
+[feature_17] building
+[feature_18] building_dist0
+[feature_19] building_dist1
+[feature_20] building_dist2
+[feature_21] grass
+[feature_22] grass_dist0
+[feature_23] grass_dist1
+[feature_24] grass_dist2
+[feature_25] curb
+[feature_26] curb_dist0
+[feature_27] curb_dist1
+[feature_28] curb_dist2
+[feature_29] fence
+[feature_30] fence_dist0
+[feature_31] fence_dist1
+[feature_32] fence_dist2
+[feature_33] gravel
+[feature_34] gravel_dist0
+[feature_35] gravel_dist1
+[feature_36] gravel_dist2
+[feature_37] observation 1 (tracker output)
+[feature_38] observation 2 (tracker output)
+[feature_39] observation 3 (tracker output)
