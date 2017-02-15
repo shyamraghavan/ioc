@@ -20,34 +20,35 @@
 using namespace std;
 using namespace cv;
 
-class CCP
-{
-public:
+typedef Vec<float, 9> Vec9f;
 
-	CCP(){}
-	~CCP(){}
+class CCP {
+  public:
+    CCP(){}
+    ~CCP(){}
 
-	void loadBasenames	(string input_filename);
-	void loadDemoTraj	(string input_file_prefix);
-	void loadFeatureMaps(string input_file_prefix);
-	void loadImages		(string input_file_prefix);
+    void initialize	                      ();
+    void loadBasenames	                  (string input_filename);
+    void loadDemoTraj	                    (string input_file_prefix);
+    void loadFeatureMaps                  (string input_file_prefix);
+    void loadImages		                    (string input_file_prefix);
+    void estimatePolicy                   ();
 
-private:
-	vector < string >				      _basenames;		      // file basenames
-	vector < vector<cv::Point> >	_trajgt;			      // ground truth trajectory
-	vector < vector<cv::Point> >	_trajob;			      // observed tracker output
-	vector < vector<cv::Mat> >		_featmap;			      // (physical) feature maps
-	vector < cv::Mat >				    _image;				      // (physical) feature maps
+  private:
+    vector < string >				      _basenames;		// file basenames
+    vector < vector<cv::Point> >	_trajgt;			// ground truth trajectory
+    vector < vector<cv::Point> >	_trajob;			// observed tracker output
+    vector < vector<cv::Mat> >		_featmap;			// (physical) feature maps
+    vector < cv::Mat >				    _image;				// (physical) feature maps
 
-	vector <cv::Point>				    _end;				        // terminal states
-	vector <cv::Point>				    _start;				      // start states
-	int								            _nf;				        // number of feature types
-	int								            _nd;				        // number of training data
-	int								            _na;				        // number of actions [3x3]
-	cv::Size					           	_size;				      // current state space size
+    vector <cv::Point>				    _end;				  // terminal states
+    vector <cv::Point>				    _start;				// start states
+    int								            _nd;				  // number of training data
+    int								            _nf;				  // number of training data
+    int								            _na;				  // number of actions [3x3]
+    float                         _h;           // bandwidth
+    cv::Size					           	_size;				// current state space size
 
-	bool							            VISUALIZE = true;
-	bool							            VERBOSE = true;
+    bool							            VISUALIZE = true;
+    bool							            VERBOSE = true;
 };
-
-

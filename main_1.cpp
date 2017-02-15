@@ -13,10 +13,13 @@ int main (int argc, char * const argv[])
 
 	CCP model;
 
+  model.initialize      ();
 	model.loadBasenames		(basenames_txt_path);
 	model.loadDemoTraj		(demontraj_txt_path_prefix);
 	model.loadFeatureMaps	(feat_maps_xml_path_prefix);
 	model.loadImages		  (rect_imag_jpg_path_prefix);
+
+  model.estimatePolicy();
 
   return 0;
 }

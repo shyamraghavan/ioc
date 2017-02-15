@@ -17,7 +17,13 @@
 
 #include "ccp.hpp"
 
-void CCP::loadBasenames	(string input_filename)
+void CCP::initialize()
+{
+  _na = 9;
+  _h = 1;
+}
+
+void CCP::loadBasenames(string input_filename)
 {
 	cout << "\nLoadBasenames()\n";
 	ifstream fs;
@@ -32,7 +38,7 @@ void CCP::loadBasenames	(string input_filename)
 }
 
 
-void CCP::loadDemoTraj	(string input_file_prefix)
+void CCP::loadDemoTraj(string input_file_prefix)
 {
 	cout << "\nLoadDemoTraj()\n";
 	for(int d=0;d<_nd;d++)
@@ -67,31 +73,29 @@ void CCP::loadFeatureMaps(string input_file_prefix)
 {
 	cout << "\nLoadFeatures()\n";
 
-	for(int i=0;i<_nd;i++)
-	{
-		_featmap.push_back(vector<cv::Mat>(0));
+  _featmap.push_back(vector<cv::Mat>(0));
 
-		string input_filename = input_file_prefix + _basenames[i] + "_feature_maps.xml";
-		FileStorage fs(input_filename.c_str(), FileStorage::READ);
-		if(!fs.isOpened()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
+  string input_filename = input_file_prefix + _basenames[0] + "_feature_maps.xml";
+  FileStorage fs(input_filename.c_str(), FileStorage::READ);
+  if(!fs.isOpened()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
 
-		for(int j=0;true;j++)
-		{
-			stringstream ss;
-			ss << "feature_" << j;
-			Mat tmp;
-			fs[ss.str()] >> tmp;
-			if(!tmp.data) break;
-			_featmap[i].push_back(tmp+0.0);
-		}
-		_nf = (int)_featmap[i].size() - 3;
-		_size = _featmap[i][0].size();
-		if(VERBOSE) printf("  %s: Number of features loaded is %d\n",_basenames[i].c_str(), _nf);
-	}
+  for(int j=0;true;j++)
+  {
+    stringstream ss;
+    ss << "feature_" << j;
+    Mat tmp;
+    fs[ss.str()] >> tmp;
+    if(!tmp.data) break;
+    _featmap[0].push_back(tmp+0.0);
+  }
+  _nf = (int)_featmap[0].size() - 3;
+  _size = _featmap[0][0].size();
+  if(VERBOSE) printf("  %s: Number of features loaded is %d\n",_basenames[0].c_str(), _nf);
+  if(VERBOSE) printf("  %s: State space loaded is %d x %d\n",_basenames[0].c_str(), _size.height, _size.width);
 }
 
 
-void CCP::loadImages		(string input_file_prefix)
+void CCP::loadImages(string input_file_prefix)
 {
 	cout << "\nLoadImages()\n";
 
@@ -105,4 +109,129 @@ void CCP::loadImages		(string input_file_prefix)
 		_image.push_back(im);
 	}
 	if(VERBOSE) cout << "  Number of images loaded: " << _image.size() << endl;
+}
+
+
+void colormap(Mat _src, Mat &dst)
+{
+	if(_src.type()!=CV_32FC1) cout << "ERROR(jetmap): must be single channel float\n";
+	double minVal,maxVal;
+	Mat src;
+	_src.copyTo(src);
+	Mat isInf;
+	minMaxLoc(src,&minVal,&maxVal,NULL,NULL);
+	compare(src,-FLT_MAX,isInf,CMP_GT);
+	threshold(src,src,-FLT_MAX,0,THRESH_TOZERO);
+	minMaxLoc(src,&minVal,NULL,NULL,NULL);
+	Mat im = (src-minVal)/(maxVal-minVal) * 255.0;
+	Mat U8,I3[3],hsv;
+	im.convertTo(U8,CV_8UC1,1.0,0);
+	I3[0] = U8 * 0.85;
+	I3[1] = isInf;
+	I3[2] = isInf;
+	merge(I3,3,hsv);
+	cvtColor(hsv,dst,CV_HSV2RGB_FULL);
+}
+
+
+void CCP::estimatePolicy()
+{
+  cout << "\nEstimatePolicy()\n";
+
+  Mat probs = Mat::zeros(_size, CV_32FC(9));
+
+  for(int y=0;y<_size.height;y+=2)
+  {
+    for(int x=0;x<_size.width;x+=2)
+    {
+      vector<float> actionSums(0);
+
+      for(int a=0;a<_na;a++)
+      {
+        float numerator = 0.0;
+        float denominator = 0.0;
+
+        for(int i=0;i<_nd;i++)
+        {
+          vector<Point> trajgt = _trajgt[i];
+
+          for(int t=0;t<(int)trajgt.size()-1;t++)
+          {
+            Point x_it = trajgt[t];
+
+            int dx = trajgt[t+1].x - trajgt[t].x;
+            int dy = trajgt[t+1].y - trajgt[t].y;
+
+            int a_it = -1;
+            if( dx==-1 && dy==-1 ) a_it = 0;
+            if( dx== 0 && dy==-1 ) a_it = 1;
+            if( dx== 1 && dy==-1 ) a_it = 2;
+
+            if( dx==-1 && dy== 0 ) a_it = 3;
+            if( dx== 0 && dy== 0 ) a_it =-1;	// stopping prohibited
+            if( dx== 1 && dy== 0 ) a_it = 5;
+
+            if( dx==-1 && dy== 1 ) a_it = 6;
+            if( dx== 0 && dy== 1 ) a_it = 7;
+            if( dx== 1 && dy== 1 ) a_it = 8;
+
+            if(a_it<0)
+            {
+              printf("ERROR: Invalid action %d(%d,%d)\n" ,t,dx,dy);
+              printf("Preprocess trajectory data properly.\n");
+              exit(1);
+            }
+
+            numerator += (a == a_it)
+              ? exp(-(pow((x_it.x - x) / _h, 2.0) + pow(((float)(x_it.y - y)) / _h, 2)) / 2.0)
+              : 0;
+            denominator +=
+              exp(-(pow(((float)(x_it.x - x)) / _h, 2.0) + pow(((float)(x_it.y - y)) / _h, 2)) / 2.0);
+          }
+        }
+        actionSums.push_back(numerator);
+      }
+
+      float actionSum = sum(actionSums)[0];
+
+      probs.at<Vec9f>(y,x)[0] = actionSums[0] / actionSum;
+      probs.at<Vec9f>(y,x)[1] = actionSums[1] / actionSum;
+      probs.at<Vec9f>(y,x)[2] = actionSums[2] / actionSum;
+      probs.at<Vec9f>(y,x)[3] = actionSums[3] / actionSum;
+      probs.at<Vec9f>(y,x)[4] = actionSums[4] / actionSum;
+      probs.at<Vec9f>(y,x)[5] = actionSums[5] / actionSum;
+      probs.at<Vec9f>(y,x)[6] = actionSums[6] / actionSum;
+      probs.at<Vec9f>(y,x)[7] = actionSums[7] / actionSum;
+      probs.at<Vec9f>(y,x)[8] = actionSums[8] / actionSum;
+
+      printf("  Estimated at state %d,%d\n", x,y);
+
+      if(VISUALIZE)
+      {
+        vector<Mat> actionProbs(9);
+        split(probs, actionProbs);
+
+        Mat dst;
+        colormap(actionProbs[0],dst);
+        addWeighted(_image[0],0.5,dst,0.5,0,dst);
+        imshow("Action " + to_string(0),dst);
+        waitKey(1);
+      }
+    }
+  }
+
+	if(VISUALIZE)
+	{
+    vector<Mat> actionProbs(9);
+    split(probs, actionProbs);
+
+    for(int a=0;a<_na;a++)
+    {
+      Mat dst;
+      colormap(actionProbs[a],dst);
+      addWeighted(_image[0],0.5,dst,0.5,0,dst);
+      imshow("Action " + to_string(a),dst);
+      waitKey(0);
+    }
+	}
 }
