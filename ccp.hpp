@@ -16,11 +16,25 @@
  */
 #include <iostream>
 #include <fstream>
+#include <pthread.h>
 #include <opencv2/opencv.hpp>
 using namespace std;
 using namespace cv;
 
 typedef Vec<float, 9> Vec9f;
+
+typedef struct par_arg {
+  Mat *probs;
+  int y;
+  int width;
+
+  float h;
+
+  int na;
+  int nd;
+
+  vector <vector<cv::Point>> trajgt;
+} par_arg;
 
 class CCP {
   public:
@@ -35,6 +49,8 @@ class CCP {
     void estimatePolicy                   ();
 
   private:
+    static void *estimatePolicyPoint      (void *arg);
+
     vector < string >				      _basenames;		// file basenames
     vector < vector<cv::Point> >	_trajgt;			// ground truth trajectory
     vector < vector<cv::Point> >	_trajob;			// observed tracker output

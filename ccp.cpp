@@ -20,7 +20,7 @@
 void CCP::initialize()
 {
   _na = 9;
-  _h = 1;
+  _h = 2;
 }
 
 void CCP::loadBasenames(string input_filename)
@@ -124,99 +124,118 @@ void colormap(Mat _src, Mat &dst)
 	threshold(src,src,-FLT_MAX,0,THRESH_TOZERO);
 	minMaxLoc(src,&minVal,NULL,NULL,NULL);
 	Mat im = (src-minVal)/(maxVal-minVal) * 255.0;
-	Mat U8,I3[3],hsv;
-	im.convertTo(U8,CV_8UC1,1.0,0);
-	I3[0] = U8 * 0.85;
-	I3[1] = isInf;
-	I3[2] = isInf;
-	merge(I3,3,hsv);
-	cvtColor(hsv,dst,CV_HSV2RGB_FULL);
+  Mat U8;
+  im.convertTo(U8, CV_8UC1);
+  applyColorMap(U8,dst,COLORMAP_JET);
 }
 
+
+void *CCP::estimatePolicyPoint(void *args)
+{
+  par_arg *arg = (par_arg *)args;
+  Mat probs = *(Mat *)(arg->probs);
+  int y = arg->y;
+
+  for(int x=0;x<arg->width;x+=1)
+  {
+    vector<float> actionSums(0);
+
+    for(int a=0;a<arg->na;a++)
+    {
+      float numerator = 0.0;
+      float denominator = 0.0;
+
+      for(int i=0;i<arg->nd;i++)
+      {
+        vector<Point> trajgt = (arg->trajgt)[i];
+
+        for(int t=0;t<(int)trajgt.size()-1;t++)
+        {
+          Point x_it = trajgt[t];
+
+          int dx = trajgt[t+1].x - trajgt[t].x;
+          int dy = trajgt[t+1].y - trajgt[t].y;
+
+          int a_it = -1;
+          if( dx==-1 && dy==-1 ) a_it = 0;
+          if( dx== 0 && dy==-1 ) a_it = 1;
+          if( dx== 1 && dy==-1 ) a_it = 2;
+
+          if( dx==-1 && dy== 0 ) a_it = 3;
+          if( dx== 0 && dy== 0 ) a_it =-1;	// stopping prohibited
+          if( dx== 1 && dy== 0 ) a_it = 5;
+
+          if( dx==-1 && dy== 1 ) a_it = 6;
+          if( dx== 0 && dy== 1 ) a_it = 7;
+          if( dx== 1 && dy== 1 ) a_it = 8;
+
+          if(a_it<0)
+          {
+            printf("ERROR: Invalid action %d(%d,%d)\n" ,t,dx,dy);
+            printf("Preprocess trajectory data properly.\n");
+            exit(1);
+          }
+
+          float h = arg->h;
+
+          numerator += (a == a_it)
+            ? exp(-(pow(((float)(x_it.x - x)) / h, 2.0)
+                  + pow(((float)(x_it.y - y)) / h, 2.0)) / 2.0)
+            : 0;
+          denominator +=
+            exp(-(pow(((float)(x_it.x - x)) / h, 2.0)
+                + pow(((float)(x_it.y - y)) / h, 2.0)) / 2.0);
+        }
+      }
+      probs.at<Vec9f>(y,x)[a] = numerator / denominator;
+    }
+
+    printf("  Estimated at state %d,%d\n", x,y);
+  }
+
+  pthread_exit(NULL);
+}
 
 void CCP::estimatePolicy()
 {
   cout << "\nEstimatePolicy()\n";
 
+  const size_t NUM_THREADS = 8;
+
   Mat probs = Mat::zeros(_size, CV_32FC(9));
+  pthread_t threads[NUM_THREADS];
+  par_arg args[NUM_THREADS];
 
-  for(int y=0;y<_size.height;y+=2)
+  for(int y=0;y<_size.height;y+=NUM_THREADS)
   {
-    for(int x=0;x<_size.width;x+=2)
+    for (int i=0;i<NUM_THREADS;i++)
     {
-      vector<float> actionSums(0);
+      args[i].y = y+i;
+      args[i].width = _size.width;
+      args[i].probs = &probs;
+      args[i].h = _h;
+      args[i].na = _na;
+      args[i].nd = _nd;
+      args[i].trajgt = _trajgt;
 
-      for(int a=0;a<_na;a++)
-      {
-        float numerator = 0.0;
-        float denominator = 0.0;
+      pthread_create(&threads[i], NULL, estimatePolicyPoint, (void *)&(args[i]));
+    }
 
-        for(int i=0;i<_nd;i++)
-        {
-          vector<Point> trajgt = _trajgt[i];
+    for (int i=0;i<NUM_THREADS;i++)
+    {
+      pthread_join(threads[i], NULL);
+    }
 
-          for(int t=0;t<(int)trajgt.size()-1;t++)
-          {
-            Point x_it = trajgt[t];
+    if(VISUALIZE)
+    {
+      vector<Mat> actionProbs(9);
+      split(probs, actionProbs);
 
-            int dx = trajgt[t+1].x - trajgt[t].x;
-            int dy = trajgt[t+1].y - trajgt[t].y;
-
-            int a_it = -1;
-            if( dx==-1 && dy==-1 ) a_it = 0;
-            if( dx== 0 && dy==-1 ) a_it = 1;
-            if( dx== 1 && dy==-1 ) a_it = 2;
-
-            if( dx==-1 && dy== 0 ) a_it = 3;
-            if( dx== 0 && dy== 0 ) a_it =-1;	// stopping prohibited
-            if( dx== 1 && dy== 0 ) a_it = 5;
-
-            if( dx==-1 && dy== 1 ) a_it = 6;
-            if( dx== 0 && dy== 1 ) a_it = 7;
-            if( dx== 1 && dy== 1 ) a_it = 8;
-
-            if(a_it<0)
-            {
-              printf("ERROR: Invalid action %d(%d,%d)\n" ,t,dx,dy);
-              printf("Preprocess trajectory data properly.\n");
-              exit(1);
-            }
-
-            numerator += (a == a_it)
-              ? exp(-(pow((x_it.x - x) / _h, 2.0) + pow(((float)(x_it.y - y)) / _h, 2)) / 2.0)
-              : 0;
-            denominator +=
-              exp(-(pow(((float)(x_it.x - x)) / _h, 2.0) + pow(((float)(x_it.y - y)) / _h, 2)) / 2.0);
-          }
-        }
-        actionSums.push_back(numerator);
-      }
-
-      float actionSum = sum(actionSums)[0];
-
-      probs.at<Vec9f>(y,x)[0] = actionSums[0] / actionSum;
-      probs.at<Vec9f>(y,x)[1] = actionSums[1] / actionSum;
-      probs.at<Vec9f>(y,x)[2] = actionSums[2] / actionSum;
-      probs.at<Vec9f>(y,x)[3] = actionSums[3] / actionSum;
-      probs.at<Vec9f>(y,x)[4] = actionSums[4] / actionSum;
-      probs.at<Vec9f>(y,x)[5] = actionSums[5] / actionSum;
-      probs.at<Vec9f>(y,x)[6] = actionSums[6] / actionSum;
-      probs.at<Vec9f>(y,x)[7] = actionSums[7] / actionSum;
-      probs.at<Vec9f>(y,x)[8] = actionSums[8] / actionSum;
-
-      printf("  Estimated at state %d,%d\n", x,y);
-
-      if(VISUALIZE)
-      {
-        vector<Mat> actionProbs(9);
-        split(probs, actionProbs);
-
-        Mat dst;
-        colormap(actionProbs[0],dst);
-        addWeighted(_image[0],0.5,dst,0.5,0,dst);
-        imshow("Action " + to_string(0),dst);
-        waitKey(1);
-      }
+      Mat dst;
+      colormap(actionProbs[0],dst);
+      addWeighted(_image[0],0.5,dst,0.5,0,dst);
+      imshow("Action " + to_string(0),dst);
+      waitKey(1);
     }
   }
 
