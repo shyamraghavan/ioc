@@ -18,8 +18,25 @@ int main (int argc, char * const argv[])
 	model.loadDemoTraj		(demontraj_txt_path_prefix);
 	model.loadFeatureMaps	(feat_maps_xml_path_prefix);
 	model.loadImages		  (rect_imag_jpg_path_prefix);
+	model.visualizeFeats	();
 
+  //model.readPolicy("./ioc_demo/walk_output/policy.txt");
   model.estimatePolicy();
+  model.savePolicy("./ioc_demo/walk_output/policy.txt");
 
+  model.estimateGamma();
+  model.estimateTransitionMatrix();
+  model.estimateZeroValueFunction();
+  model.estimateValueFunction();
+  model.saveValueFunction("./ioc_demo/walk_output/valuefun.txt");
+
+  //model.readValueFunction("./ioc_demo/walk_output/valuefun.txt");
+  model.visualizeValueFunction();
+
+  model.estimateRewardFunction();
+  model.saveRewardFunction("./ioc_demo/walk_output/rewardfun.txt");
+
+  //model.readRewardFunction("./ioc_demo/walk_output/rewardfun.txt");
+  model.visualizeRewardFunction();
   return 0;
 }
