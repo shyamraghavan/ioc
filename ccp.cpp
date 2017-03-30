@@ -42,10 +42,10 @@ void CCP::initialize()
 {
   _na = 9;
   _h = 2;
-  _hf = 0.1;
+  _hf = 1;
 
   _a0 = 5;
-  _B = .9;
+  _B = .5;
   _E = 0.0000000001;
 }
 
@@ -490,16 +490,14 @@ void CCP::estimateZeroValueFunction()
   Mat V0 = Mat(BT.size(0), 1, CV_32FC1, 0.0);
   Mat V0_original = V0.clone();
 
-  multiply(BT, V0_original, &V0);
-  V0 = V0 + (_B * _gamma);
+  multiply(BT, V0_original + _gamma, &V0);
 
   int index = 0;
 
   while(!equal(V0_original,V0,ns,_E))
   {
     V0.copyTo(V0_original);
-    multiply(BT, V0_original, &V0);
-    V0 = V0 + (_B * _gamma);
+    multiply(BT, V0_original + _gamma, &V0);
 
     if (VERBOSE && index % 10 == 0)
       printf("  %d value iterations complete\n", index);
@@ -651,7 +649,7 @@ void CCP::estimateRewardFunction()
         int y_n = max(0, min(_size.height - 1, y + dy));
         int x_n = max(0, min(_size.width - 1, x + dx));
 
-        float r = V_ax - _B * (_V0.at<float>(y_n,x_n) + _gamma.at<float>(y,x));
+        float r = V_ax - _B * (_V0.at<float>(y_n,x_n) + _gamma.at<float>(y_n,x_n));
 
         R.at<Vec9f>(y,x)[a] = r;
       }

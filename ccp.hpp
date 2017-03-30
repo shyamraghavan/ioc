@@ -84,6 +84,6 @@ class CCP {
     float                         _hf;          // feature bandwidth
     cv::Size					           	_size;				// current state space size
 
-    bool							            VISUALIZE = false;
+    bool							            VISUALIZE = true;
     bool							            VERBOSE = true;
 };
