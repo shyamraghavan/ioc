@@ -35,6 +35,7 @@ class Transfer {
     void reshapePrevFeatMap();
 
     void loadBasenames(string input_filename);
+    void loadFeatMap(string input_file_prefix);
 
     int _prev_nd;
     int _prev_na;

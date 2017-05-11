@@ -165,3 +165,40 @@ void Transfer::loadBasenames(string input_filename)
 	_nd = (int)_basenames.size();
 	if(VERBOSE) cout << "  Number of basenames loaded:" << _nd << endl;
 }
+
+void Transfer::loadFeatMap(string input_file_prefix)
+{
+	cout << "\nLoadFeatMap()\n";
+
+	for(int i=0;i<_nd;i++)
+	{
+		_featmap.push_back(vector<cv::Mat>(0));
+
+		string input_filename = input_file_prefix + _basenames[i] + "_features.yml";
+		FileStorage fs(input_filename.c_str(), FileStorage::READ);
+		if(!fs.isOpened()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
+
+    Mat pavement;
+    fs["pavement"] >> pavement;
+    _featmap[i].push_back(feat+0.0);
+
+    _nf = 1;
+    _size = _featmap[i][0].size();
+
+    if(VERBOSE)
+    {
+      printf(
+        "  %s: Number of features loaded is %d\n",
+        _basenames[i].c_str(),
+        _nf
+      );
+      printf(
+        "  %s: State space loaded is %d x %d\n",
+        _basenames[i].c_str(),
+        _size.height,
+        _size.width
+      );
+    }
+	}
+}
+

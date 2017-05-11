@@ -21,6 +21,7 @@ int main (int argc, char * const argv[])
   exp.reshapePrevFeatMap();
 
   exp.loadBasenames(basenames_txt_path);
+  exp.loadFeatMap(feat_maps_xml_path_prefix);
 
   return 0;
 }
