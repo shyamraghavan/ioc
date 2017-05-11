@@ -40,7 +40,7 @@ public:
 	//void computeLikelihood	();
 	void gradientUpdate		();
 
-	bool _converged;
+	int _converged;
 
 	void saveParameters	(string output_filename);
 

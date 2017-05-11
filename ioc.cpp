@@ -165,7 +165,7 @@ void IOC::initialize(bool verbose, bool visualize)
 	_f_gradient  = vector<float>(_nf,0);		// allocate memory
 
 	_minloglikelihood = -FLT_MAX;
-
+  _converged = 0;
 }
 
 
@@ -418,10 +418,13 @@ void IOC::gradientUpdate()
 
 void IOC::saveParameters(string output_filename)
 {
+  cout << "\nSaveParameters()\n";
+
 	ofstream fs(output_filename.c_str());
 	if(!fs.is_open()) cout << "ERROR: Writing: " << output_filename << endl;
-	for(int f=0;f<(int)_w_best.size();f++)
+	for(int f=0;f<(int)_w_best.size();f++) {
 		fs << _w_best[f] << endl;
+  }
 }
 
 

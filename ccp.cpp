@@ -44,9 +44,16 @@ void CCP::initialize()
   _h = 2;
   _hf = 1;
 
-  _a0 = 5;
-  _B = .5;
+  _a0 = Point(80,130);
+  _a0_t = 0;
+  _B = .95;
   _E = 0.0000000001;
+
+  _a_binwidth = 0.3;
+  _gamma_binwidth = 1;
+
+  _samp_size = 100;
+  _num_samps = 1000;
 }
 
 void CCP::loadBasenames(string input_filename)
@@ -164,112 +171,178 @@ void CCP::estimatePolicyPoint(CCP *inst, void *args)
   par_arg *arg = (par_arg *)args;
   Mat probs = *(Mat *)(arg->probs);
   int y = arg->y;
+  int t = arg->t;
 
   for(int x=0;x<inst->_size.width;x+=1)
   {
-    vector<float> actionSums(0);
-
     for(int a=0;a<inst->_na;a++)
     {
       float numerator = 0.0;
       float denominator = 0.0;
 
+      int dx,dy;
+
+      if(a == 0) { dx=-1; dy=-1; }
+      if(a == 1) { dx=0; dy=-1; }
+      if(a == 2) { dx=1; dy=-1; }
+      if(a == 3) { dx=-1; dy=0; }
+      if(a == 4) { continue; }
+      if(a == 5) { dx=1; dy=0; }
+      if(a == 6) { dx=-1; dy=1; }
+      if(a == 7) { dx=0; dy=1; }
+      if(a == 8) { dx=1; dy=1; }
+
       for(int i=0;i<inst->_nd;i++)
       {
         vector<Point> trajgt = inst->_trajgt[i];
 
-        for(int t=0;t<(int)trajgt.size()-1;t++)
+        for(int b=0;b<(int)trajgt.size()-1;b++)
         {
-          Point x_it = trajgt[t];
-
-          int dx = trajgt[t+1].x - trajgt[t].x;
-          int dy = trajgt[t+1].y - trajgt[t].y;
-
-          int a_it = -1;
-          if( dx==-1 && dy==-1 ) a_it = 0;
-          if( dx== 0 && dy==-1 ) a_it = 1;
-          if( dx== 1 && dy==-1 ) a_it = 2;
-
-          if( dx==-1 && dy== 0 ) a_it = 3;
-          if( dx== 0 && dy== 0 ) a_it =-1;	// stopping prohibited
-          if( dx== 1 && dy== 0 ) a_it = 5;
-
-          if( dx==-1 && dy== 1 ) a_it = 6;
-          if( dx== 0 && dy== 1 ) a_it = 7;
-          if( dx== 1 && dy== 1 ) a_it = 8;
-
-          if(a_it<0)
-          {
-            printf("ERROR: Invalid action %d(%d,%d)\n",t,dx,dy);
-            printf("Preprocess trajectory data properly.\n");
-            exit(1);
-          }
+          Point x_cur  = trajgt[b];
+          Point x_next = trajgt[b+1];
 
           float total_exp = 0;
-          total_exp += pow(((float)(x_it.x - x)) / inst->_h, 2.0);
-          total_exp += pow(((float)(x_it.y - y)) / inst->_h, 2.0);
+          bool include = true;
 
           for(int f=0;f<inst->_nf;f++)
           {
             float feat =
-              inst->_featmap[i][f].at<float>(x_it) -
-              inst->_featmap[i][f].at<float>(y,x);
+              inst->_featmap[i][f].at<float>(x_cur) -
+              inst->_featmap[t][f].at<float>(y,x);
             total_exp += pow(feat / inst->_hf, 2.0);
+
+            include &=
+              abs(inst->_featmap[t][f].at<float>(y+dy, x+dx) -
+                  inst->_featmap[i][f].at<float>(x_next)) < inst->_a_binwidth;
           }
 
-          numerator += (a == a_it) ? exp(-total_exp / 2.0) : 0;
+          numerator += include ? exp(-total_exp / 2.0) : 0;
           denominator += exp(-total_exp / 2.0);
         }
       }
-      probs.at<Vec9f>(y,x)[a] = numerator / denominator;
+
+      int index = x + y * inst->_size.width + t * (inst->_size.width * inst->_size.height);
+      probs.at<Vec9f>(index)[a] = numerator / denominator;
+    }
+  }
+
+  if (inst->VERBOSE) printf("  Estimated at row %d on trajectory %d\n", y, t);
+}
+
+void CCP::estimatePolicyPointSubsample(CCP *inst, void *args)
+{
+  par_arg *arg = (par_arg *)args;
+  Mat probs = *(Mat *)(arg->probs);
+  int y = arg->y;
+  int t = arg->t;
+
+  for(int x=0;x<inst->_size.width;x+=1)
+  {
+    for(int a=0;a<inst->_na;a++)
+    {
+      float numerator = 0.0;
+      float denominator = 0.0;
+
+      int dx,dy;
+
+      if(a == 0) { dx=-1; dy=-1; }
+      if(a == 1) { dx=0; dy=-1; }
+      if(a == 2) { dx=1; dy=-1; }
+      if(a == 3) { dx=-1; dy=0; }
+      if(a == 4) { printf("Cannot let _a0 be no movement\n"); exit(0); }
+      if(a == 5) { dx=1; dy=0; }
+      if(a == 6) { dx=-1; dy=1; }
+      if(a == 7) { dx=0; dy=1; }
+      if(a == 8) { dx=1; dy=1; }
+
+      for(int i=0;i<inst->_samp_size;i++)
+      {
+        vector<Point> trajgt = inst->_trajgt[inst->_currentSampleTraj[i]];
+        int b = inst->_currentSamplePoint[i];
+
+        Point x_cur  = trajgt[b];
+        Point x_next = trajgt[b == trajgt.size() - 1 ? t-1 : t+1];
+
+        float total_exp = 0;
+        bool include = true;
+
+        for(int f=0;f<inst->_nf;f++)
+        {
+          int trajInd = inst->_currentSampleTraj[i];
+          float feat =
+            inst->_featmap[trajInd][f].at<float>(x_cur) -
+            inst->_featmap[t][f].at<float>(y,x);
+          total_exp += pow(feat / inst->_hf, 2.0);
+
+          include &=
+            abs(inst->_featmap[t][f].at<float>(y+dy, x+dx) -
+                inst->_featmap[i][f].at<float>(x_next)) < inst->_a_binwidth;
+        }
+
+        numerator += include ? exp(-total_exp / 2.0) : 0;
+        denominator += exp(-total_exp / 2.0);
+      }
+
+      int index = x + y * inst->_size.width + t * (inst->_size.width * inst->_size.height);
+      probs.at<Vec9f>(index)[a] = numerator / denominator;
     }
   }
 
   if (inst->VERBOSE) printf("  Estimated at row %d\n", y);
 }
 
-void CCP::estimatePolicy()
+void CCP::estimatePolicy(bool subsample)
 {
   cout << "\nEstimatePolicy()\n";
 
   const size_t NUM_THREADS = 16;
 
-  _probs = Mat::zeros(_size, CV_32FC(9));
+  _probs = Mat::zeros(_size.height * _size.width * _nd, 1, CV_32FC(9));
   vector<thread> threads;
   par_arg args[NUM_THREADS];
 
-  for(int y=0;y<_size.height;y+=NUM_THREADS)
+  for(int t=0;t<_nd;t++)
   {
-    for (int i=0;i<NUM_THREADS;i++)
+    for(int y=0;y<_size.height;y+=NUM_THREADS)
     {
-      if (y+i < _size.height)
+      for (int i=0;i<NUM_THREADS;i++)
       {
-        args[i].y = y+i;
-        args[i].probs = &_probs;
+        if (y+i < _size.height)
+        {
+          args[i].y = y+i;
+          args[i].probs = &_probs;
+          args[i].t = t;
 
-        threads.push_back(thread(estimatePolicyPoint, this, &(args[i])));
+          if (subsample)
+          {
+            threads.push_back(thread(estimatePolicyPointSubsample, this, &(args[i])));
+          } else {
+            threads.push_back(thread(estimatePolicyPoint, this, &(args[i])));
+          }
+        }
       }
-    }
 
-    for (int i=0;i<NUM_THREADS;i++)
-    {
-      if (y+i < _size.height)
+      for (int i=0;i<NUM_THREADS;i++)
       {
-        threads[0].join();
-        threads.erase(threads.begin());
+        if (y+i < _size.height)
+        {
+          threads[0].join();
+          threads.erase(threads.begin());
+        }
       }
-    }
 
-    if(VISUALIZE)
-    {
-      vector<Mat> actionProbs(9);
-      split(_probs, actionProbs);
+      if(VISUALIZE && !subsample)
+      {
+        vector<Mat> actionProbs(9);
+        split(_probs, actionProbs);
+        Mat act = actionProbs[0].rowRange((_size.width * _size.height) * t,(_size.width * _size.height) * (t + 1)).reshape(0, _size.height);
 
-      Mat dst;
-      colormap(actionProbs[0],dst);
-      addWeighted(_image[0],0.5,dst,0.5,0,dst);
-      imshow("Action " + to_string(0),dst);
-      waitKey(1);
+        Mat dst;
+        colormap(act,dst);
+        addWeighted(_image[t],0.5,dst,0.5,0,dst);
+        imshow("Action " + to_string(0),dst);
+        waitKey(1);
+      }
     }
   }
 
@@ -278,17 +351,18 @@ void CCP::estimatePolicy()
   vector<Mat> actionProbs(9);
   split(_probs, actionProbs);
 
-	if(VISUALIZE)
+	if(VISUALIZE && !subsample)
 	{
     for(int a=0;a<_na;a++)
     {
       Mat dst;
-      colormap(actionProbs[a],dst);
+      colormap(actionProbs[a].rowRange(0,_size.width*_size.height).reshape(0, _size.height),dst);
       addWeighted(_image[0],0.5,dst,0.5,0,dst);
       imshow("Action " + to_string(a),dst);
       waitKey(0);
     }
 	}
+
 }
 
 void CCP::savePolicy(string output_filename)
@@ -297,17 +371,22 @@ void CCP::savePolicy(string output_filename)
 
   ofstream fs(output_filename.c_str());
   if(!fs.is_open()) cout << "ERROR: Writing: " << output_filename << endl;
-  for(int y=0;y<_size.height;y++)
+  for(int t=0;t<_nd;t++)
   {
-    for(int x=0;x<_size.width;x++)
+    for(int y=0;y<_size.height;y++)
     {
-      for(int a=0;a<_na;a++)
+      for(int x=0;x<_size.width;x++)
       {
-        fs << to_string(_probs.at<Vec9f>(y,x)[a]) << "\t";
+        for(int a=0;a<_na;a++)
+        {
+          int index = x + y * _size.width + t * (_size.width * _size.height);
+          fs << to_string(_probs.at<Vec9f>(index)[a]) << "\t";
+        }
+        fs << endl;
       }
-      fs << endl;
     }
   }
+  fs.close();
 }
 
 void CCP::readPolicy(string input_filename)
@@ -319,7 +398,7 @@ void CCP::readPolicy(string input_filename)
   if(!fs.is_open()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
 
   string str;
-  Mat p(1, _size.height * _size.width, CV_32FC(9));
+  Mat p(_nd * _size.height * _size.width, 1, CV_32FC(9));
 
   int x = 0;
 
@@ -329,9 +408,9 @@ void CCP::readPolicy(string input_filename)
     size_t l = str.length();
 
     size_t i = 0;
-    while(a < 9)
+    while(a < _na)
     {
-      p.at<Vec9f>(0,x)[a] = stof(str, &i);
+      p.at<Vec9f>(x)[a] = stof(str, &i);
       str = str.substr(i);
 
       a++;
@@ -339,7 +418,22 @@ void CCP::readPolicy(string input_filename)
     x++;
   }
 
-  _probs = p.reshape(0, _size.height).clone();
+  _probs = p.clone();
+
+  vector<Mat> actionProbs(9);
+  split(_probs, actionProbs);
+
+	if(VISUALIZE)
+	{
+    for(int a=0;a<_na;a++)
+    {
+      Mat dst;
+      colormap(actionProbs[a].rowRange(0,_size.width*_size.height).reshape(0, _size.height),dst);
+      addWeighted(_image[0],0.5,dst,0.5,0,dst);
+      imshow("Action " + to_string(a),dst);
+      waitKey(0);
+    }
+	}
 }
 
 void CCP::estimateGamma()
@@ -347,65 +441,112 @@ void CCP::estimateGamma()
   cout << "\nEstimateGamma()\n";
 
   vector<float> gamma(0);
-  _gammaM = Mat(_size.height, _size.width, CV_32FC(9));
 
-  for(int y=0;y<_size.height;y++)
+  vector<float> a0f;
+
+  for(int f=0;f<_nf;f++)
   {
-    for(int x=0;x<_size.width;x++)
-    {
-      float val = 0.0;
-
-      for(int a=0;a<_na;a++)
-      {
-        float n = _probs.at<Vec9f>(y,x)[a];
-        float d = _probs.at<Vec9f>(y,x)[_a0];
-
-        if(d != 0)
-        {
-          _gammaM.at<Vec9f>(y,x)[a] = n/d;
-          val += log(1.0 + n/d);
-        } else {
-          _gammaM.at<Vec9f>(y,x)[a] = nanf("");
-          val = nanf("");
-        }
-      }
-
-      gamma.push_back(val);
-    }
+    a0f.push_back(_featmap[_a0_t][f].at<float>(_a0));
   }
 
-  if(VERBOSE)
+  Mat a0(a0f, true);
+
+  for(int t=0;t<_nd;t++)
   {
-    const string a("./ioc_demo/walk_output/gamma.txt");
-    ofstream fs(a.c_str());
-    if(!fs.is_open()) cout << "ERROR: Writing: " << a << endl;
     for(int y=0;y<_size.height;y++)
     {
       for(int x=0;x<_size.width;x++)
       {
+        float val = 0.0;
+
+        int index = x + y * _size.width + t * (_size.width * _size.height);
+        int min_a = 0;
+        float error = FLT_MAX;
+
         for(int a=0;a<_na;a++)
         {
-          fs << to_string(_gammaM.at<Vec9f>(y,x)[a]) << "\t";
+          vector<float> afv;
+          int dx,dy;
+
+          if(a == 0) { dx=-1; dy=-1; }
+          if(a == 1) { dx=0; dy=-1; }
+          if(a == 2) { dx=1; dy=-1; }
+          if(a == 3) { dx=-1; dy=0; }
+          if(a == 4) { continue; }
+          if(a == 5) { dx=1; dy=0; }
+          if(a == 6) { dx=-1; dy=1; }
+          if(a == 7) { dx=0; dy=1; }
+          if(a == 8) { dx=1; dy=1; }
+
+          for(int f=0;f<_nf;f++)
+          {
+            afv.push_back(_featmap[t][f].at<float>(y+dy,x+dx));
+          }
+
+          Mat af(afv, true);
+
+          float tmperror = sum((af - a0).mul(af - a0))[0];
+
+          if (tmperror < error) {
+            error = tmperror;
+            min_a = a;
+          }
         }
-        fs << endl;
+
+        int dx,dy;
+        bool a0_exists = true;
+
+        if(min_a == 0) { dx=-1; dy=-1; }
+        if(min_a == 1) { dx=0; dy=-1; }
+        if(min_a == 2) { dx=1; dy=-1; }
+        if(min_a == 3) { dx=-1; dy=0; }
+        if(min_a == 4) { printf("Cannot let _a0 be no movement\n"); exit(0); }
+        if(min_a == 5) { dx=1; dy=0; }
+        if(min_a == 6) { dx=-1; dy=1; }
+        if(min_a == 7) { dx=0; dy=1; }
+        if(min_a == 8) { dx=1; dy=1; }
+
+        for(int f=0;f<_nf;f++)
+        {
+          //a0_exists = a0_exists && (abs(_featmap[t][f].at<float>(y+dy,x+dx) -
+          //        _featmap[_a0_t][f].at<float>(_a0)) <= _gamma_binwidth);
+        }
+
+        if (a0_exists) {
+          for(int a=0;a<_na;a++)
+          {
+            float n = _probs.at<Vec9f>(index)[a];
+            float d = _probs.at<Vec9f>(index)[min_a];
+
+            if(d != 0)
+            {
+              val += log(1.0 + n/d);
+            } else {
+              val = nanf("");
+            }
+          }
+        } else {
+          val = nanf("");
+        }
+
+        gamma.push_back(val);
       }
     }
   }
 
-  _gamma = Mat(gamma, true); // _size.height * _size.width x 1
-  Mat _stuff = _gamma.clone();
+  _gamma = Mat(gamma, true); // _size.height * _size.width * _nd x 1
+  Mat vis_gamma;
+  _gamma.copyTo(vis_gamma);
 
   if(VISUALIZE)
   {
-    _gamma = _gamma.reshape(0,_size.height);
+    vis_gamma = vis_gamma.rowRange(0,_size.width*_size.height).reshape(0,_size.height);
 
     Mat dst;
-    colormap(_gamma,dst);
+    colormap(vis_gamma,dst);
     addWeighted(_image[0],0.5,dst,0.5,0,dst);
     imshow("Gamma Vector",dst);
     waitKey(0);
-
-    _gamma = _gamma.reshape(0,_size.height*_size.width);
   }
 }
 
@@ -413,31 +554,80 @@ void CCP::estimateTransitionMatrix()
 {
   cout << "\nEstimateTransitionMatrix()\n";
 
-  int ns = _size.height * _size.width;
+  int ns = _size.height * _size.width * _nd;
   int size[] = {ns,ns};
 
   _T = SparseMat(2,size,CV_32FC1);
 
-  for(int x=0;x<ns;x++)
+  vector<float> a0f;
+
+  for(int f=0;f<_nf;f++)
   {
-    int dx = 0;
-    int dy = 0;
+    a0f.push_back(_featmap[_a0_t][f].at<float>(_a0));
+  }
 
-    if(_a0 == 0) { dx=-1; dy=-1; }
-    if(_a0 == 1) { dx=0; dy=-1; }
-    if(_a0 == 2) { dx=1; dy=-1; }
-    if(_a0 == 3) { dx=-1; dy=0; }
-    if(_a0 == 4) { printf("Cannot let _a0 be no movement\n"); exit(0); }
-    if(_a0 == 5) { dx=1; dy=0; }
-    if(_a0 == 6) { dx=-1; dy=1; }
-    if(_a0 == 7) { dx=0; dy=1; }
-    if(_a0 == 8) { dx=1; dy=1; }
+  Mat a0(a0f, true);
 
-    int dstate = _size.width * dy + dx;
-
-    if (x+dstate<ns && x+dstate>0)
+  for(int t=0;t<_nd;t++)
+  {
+    for(int x=0;x<_size.width;x++)
     {
-      _T.ref<float>(x,x+dstate) = 1.0;
+      for(int y=0;y<_size.height;y++)
+      {
+        int index = x + y * _size.width + t * (_size.width * _size.height);
+
+        int min_a = 0;
+        float error = FLT_MAX;
+
+        for(int a=0;a<_na;a++)
+        {
+          vector<float> afv;
+          int dx,dy;
+
+          if(a == 0) { dx=-1; dy=-1; }
+          if(a == 1) { dx=0; dy=-1; }
+          if(a == 2) { dx=1; dy=-1; }
+          if(a == 3) { dx=-1; dy=0; }
+          if(a == 4) { continue; }
+          if(a == 5) { dx=1; dy=0; }
+          if(a == 6) { dx=-1; dy=1; }
+          if(a == 7) { dx=0; dy=1; }
+          if(a == 8) { dx=1; dy=1; }
+
+          for(int f=0;f<_nf;f++)
+          {
+            afv.push_back(_featmap[t][f].at<float>(y+dy,x+dx));
+          }
+
+          Mat af(afv, true);
+
+          float tmperror = sum((af - a0).mul(af - a0))[0];
+
+          if (tmperror < error) {
+            error = tmperror;
+            min_a = a;
+          }
+        }
+
+        int dx,dy;
+
+        if(min_a == 0) { dx=-1; dy=-1; }
+        if(min_a == 1) { dx=0; dy=-1; }
+        if(min_a == 2) { dx=1; dy=-1; }
+        if(min_a == 3) { dx=-1; dy=0; }
+        if(min_a == 4) { printf("Cannot let _a0 be no movement\n"); exit(0); }
+        if(min_a == 5) { dx=1; dy=0; }
+        if(min_a == 6) { dx=-1; dy=1; }
+        if(min_a == 7) { dx=0; dy=1; }
+        if(min_a == 8) { dx=1; dy=1; }
+
+        int index_n = index + dx + (_size.width * dy);
+
+        if (index_n < ns && index_n > 0)
+        {
+          _T.ref<float>(index,index_n) = 1.0;
+        }
+      }
     }
   }
 
@@ -476,7 +666,7 @@ void CCP::estimateZeroValueFunction()
 {
   cout << "\nEstimateZeroValueFunction()\n";
 
-  int ns = _size.height * _size.width;
+  int ns = _size.height * _size.width * _nd;
   int size[] = {ns,ns};
 
   SparseMat BT;
@@ -507,15 +697,12 @@ void CCP::estimateZeroValueFunction()
 
   if (VERBOSE) printf("  Converged in %d iterations\n", index);
 
-  V0 = V0.reshape(0, _size.height);
-  _gamma = _gamma.reshape(0, _size.height);
-
   _V0 = V0.clone();
 
   if (VISUALIZE)
   {
     Mat dst;
-    colormap(_V0,dst);
+    colormap(_V0.rowRange(0,_size.width*_size.height).reshape(0,_size.height),dst);
     addWeighted(_image[0],0.5,dst,0.5,0,dst);
     imshow("Value Function for 0-Reward Action",dst);
     waitKey(0);
@@ -526,26 +713,85 @@ void CCP::estimateValueFunction()
 {
   cout << "\nEstimateValueFunction()\n";
 
-  _V = Mat(_size, CV_32FC(9));
+  _V = Mat(_size.width * _size.height * _nd, 1, CV_32FC(9));
 
-  for(int y=0;y<_size.height;y++)
+  vector<float> a0f;
+
+  for(int f=0;f<_nf;f++)
   {
-    for(int x=0;x<_size.width;x++)
-    {
-      for(int a=0; a<_na; a++)
-      {
-        float n = _probs.at<Vec9f>(y,x)[a];
-        float d = _probs.at<Vec9f>(y,x)[_a0];
+    a0f.push_back(_featmap[_a0_t][f].at<float>(_a0));
+  }
 
-        if(d != 0 && n != 0)
+  Mat a0(a0f, true);
+
+  for(int t=0;t<_nd;t++)
+  {
+    for(int y=0;y<_size.height;y++)
+    {
+      for(int x=0;x<_size.width;x++)
+      {
+        int min_a = 0;
+        float error = FLT_MAX;
+
+        for(int a=0;a<_na;a++)
         {
-          _V.at<Vec9f>(y,x)[a] = log(n/d) + _V0.at<float>(y,x);
-        } else {
-          _V.at<Vec9f>(y,x)[a] = nanf("");
+          vector<float> afv;
+          int dx,dy;
+
+          if(a == 0) { dx=-1; dy=-1; }
+          if(a == 1) { dx=0; dy=-1; }
+          if(a == 2) { dx=1; dy=-1; }
+          if(a == 3) { dx=-1; dy=0; }
+          if(a == 4) { continue; }
+          if(a == 5) { dx=1; dy=0; }
+          if(a == 6) { dx=-1; dy=1; }
+          if(a == 7) { dx=0; dy=1; }
+          if(a == 8) { dx=1; dy=1; }
+
+          for(int f=0;f<_nf;f++)
+          {
+            afv.push_back(_featmap[t][f].at<float>(y+dy,x+dx));
+          }
+
+          Mat af(afv, true);
+
+          float tmperror = sum((af - a0).mul(af - a0))[0];
+
+          if (tmperror < error) {
+            error = tmperror;
+            min_a = a;
+          }
+        }
+
+        int dx,dy;
+
+        if(min_a == 0) { dx=-1; dy=-1; }
+        if(min_a == 1) { dx=0; dy=-1; }
+        if(min_a == 2) { dx=1; dy=-1; }
+        if(min_a == 3) { dx=-1; dy=0; }
+        if(min_a == 4) { printf("Cannot let _a0 be no movement\n"); exit(0); }
+        if(min_a == 5) { dx=1; dy=0; }
+        if(min_a == 6) { dx=-1; dy=1; }
+        if(min_a == 7) { dx=0; dy=1; }
+        if(min_a == 8) { dx=1; dy=1; }
+
+        for(int a=0;a<_na;a++)
+        {
+          int index = x + y * _size.width + t * _size.height * _size.width;
+
+          float n = _probs.at<Vec9f>(index)[a];
+          float d = _probs.at<Vec9f>(index)[min_a];
+
+          if(d != 0 && n != 0)
+          {
+            _V.at<Vec9f>(index)[a] = log(n/d) + _V0.at<float>(index);
+          } else {
+            _V.at<Vec9f>(index)[a] = nanf("");
+          }
         }
       }
     }
-  };
+  }
 }
 
 void CCP::visualizeValueFunction()
@@ -560,7 +806,7 @@ void CCP::visualizeValueFunction()
     for(int a=0;a<_na;a++)
     {
       Mat dst;
-      colormap(value[a],dst);
+      colormap(value[a].rowRange(0,_size.width*_size.height).reshape(0,_size.height),dst);
       addWeighted(_image[0],0.5,dst,0.5,0,dst);
       imshow("Action " + to_string(a),dst);
       waitKey(0);
@@ -574,17 +820,22 @@ void CCP::saveValueFunction(string output_filename)
 
   ofstream fs(output_filename.c_str());
   if(!fs.is_open()) cout << "ERROR: Writing: " << output_filename << endl;
-  for(int y=0;y<_size.height;y++)
+  for(int t=0;t<_nd;t++)
   {
-    for(int x=0;x<_size.width;x++)
+    for(int y=0;y<_size.height;y++)
     {
-      for(int a=0;a<_na;a++)
+      for(int x=0;x<_size.width;x++)
       {
-        fs << to_string(_V.at<Vec9f>(y,x)[a]) << "\t";
+        for(int a=0;a<_na;a++)
+        {
+          int index = x + y * _size.width + t * _size.width * _size.height;
+          fs << to_string(_V.at<Vec9f>(index)[a]) << "\t";
+        }
+        fs << endl;
       }
-      fs << endl;
     }
   }
+  fs.close();
 }
 
 void CCP::readValueFunction(string input_filename)
@@ -596,7 +847,7 @@ void CCP::readValueFunction(string input_filename)
   if(!fs.is_open()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
 
   string str;
-  Mat p(1, _size.height * _size.width, CV_32FC(9));
+  Mat p(1, _size.height * _size.width * _nd, CV_32FC(9));
 
   int x = 0;
 
@@ -616,42 +867,47 @@ void CCP::readValueFunction(string input_filename)
     x++;
   }
 
-  _V = p.reshape(0, _size.height).clone();
+  _V = p.clone();
 }
 
 void CCP::estimateRewardFunction()
 {
   cout << "\nEstimateRewardFunction()\n";
 
-  Mat R(_size, CV_32FC(9));
+  Mat R(_size.width * _size.height * _nd, 1, CV_32FC(9));
 
-  for(int y=0;y<_size.height;y++)
+  for(int t=0;t<_nd;t++)
   {
-    for(int x=0;x<_size.width;x++)
+    for(int y=0;y<_size.height;y++)
     {
-      for(int a=0;a<_na;a++)
+      for(int x=0;x<_size.width;x++)
       {
-        float V_ax = _V.at<Vec9f>(y,x)[a];
+        for(int a=0;a<_na;a++)
+        {
+          int index = x + _size.width * y + t * _size.width * _size.height;
+          float V_ax = _V.at<Vec9f>(index)[a];
 
-        int dx = 0;
-        int dy = 0;
+          int dx = 0;
+          int dy = 0;
 
-        if(a == 0) { dx=-1; dy=-1; }
-        if(a == 1) { dx=0; dy=-1; }
-        if(a == 2) { dx=1; dy=-1; }
-        if(a == 3) { dx=-1; dy=0; }
-        if(a == 4) { dx=0; dy=0; }
-        if(a == 5) { dx=1; dy=0; }
-        if(a == 6) { dx=-1; dy=1; }
-        if(a == 7) { dx=0; dy=1; }
-        if(a == 8) { dx=1; dy=1; }
+          if(a == 0) { dx=-1; dy=-1; }
+          if(a == 1) { dx=0; dy=-1; }
+          if(a == 2) { dx=1; dy=-1; }
+          if(a == 3) { dx=-1; dy=0; }
+          if(a == 4) { dx=0; dy=0; }
+          if(a == 5) { dx=1; dy=0; }
+          if(a == 6) { dx=-1; dy=1; }
+          if(a == 7) { dx=0; dy=1; }
+          if(a == 8) { dx=1; dy=1; }
 
-        int y_n = max(0, min(_size.height - 1, y + dy));
-        int x_n = max(0, min(_size.width - 1, x + dx));
+          int y_n = max(0, min(_size.height - 1, y + dy));
+          int x_n = max(0, min(_size.width - 1, x + dx));
 
-        float r = V_ax - _B * (_V0.at<float>(y_n,x_n) + _gamma.at<float>(y_n,x_n));
+          int index_n = x_n + _size.width * y_n + t * _size.width * _size.height;
+          float r = V_ax - _B * (_V0.at<float>(index_n) + _gamma.at<float>(index_n));
 
-        R.at<Vec9f>(y,x)[a] = r;
+          R.at<Vec9f>(index)[a] = r;
+        }
       }
     }
   }
@@ -671,35 +927,9 @@ void CCP::visualizeRewardFunction()
     for(int a=0;a<_na;a++)
     {
       Mat dst;
-      colormap(value[a],dst);
+      colormap(value[a].rowRange(0,_size.width*_size.height).reshape(0,_size.height),dst);
       addWeighted(_image[0],0.5,dst,0.5,0,dst);
       imshow("Action " + to_string(a),dst);
-      waitKey(0);
-    }
-
-    Mat act(_size, CV_32FC(9), 0.0);
-
-    for(int y=0;y<_size.height;y++)
-    {
-      for(int x=0;x<_size.width;x++)
-      {
-        Point p;
-
-        minMaxLoc(_R.at<Vec9f>(y,x), NULL, NULL, NULL, &p);
-
-        act.at<Vec9f>(y,x)[p.y] = 1.0;
-      }
-    }
-
-    vector<Mat> value2(9);
-    split(act, value2);
-
-    for(int a=0;a<_na;a++)
-    {
-      Mat dst;
-      colormap(value2[a],dst);
-      addWeighted(_image[0],0.5,dst,0.5,0,dst);
-      imshow("Optimal Action " + to_string(a),dst);
       waitKey(0);
     }
   }
@@ -711,17 +941,27 @@ void CCP::saveRewardFunction(string output_filename)
 
   ofstream fs(output_filename.c_str());
   if(!fs.is_open()) cout << "ERROR: Writing: " << output_filename << endl;
-  for(int y=0;y<_size.height;y++)
+  for(int t=0;t<_nd;t++)
   {
-    for(int x=0;x<_size.width;x++)
+    for(int y=0;y<_size.height;y++)
     {
-      for(int a=0;a<_na;a++)
+      for(int x=0;x<_size.width;x++)
       {
-        fs << to_string(_R.at<Vec9f>(y,x)[a]) << "\t";
+        for(int a=0;a<_na;a++)
+        {
+          int index = x + _size.width * y + t * _size.width * _size.height;
+          fs << to_string(_R.at<Vec9f>(index)[a]) << "\t";
+        }
+        fs << endl;
       }
-      fs << endl;
     }
   }
+  fs.close();
+}
+
+void CCP::saveTrueRewardFunction()
+{
+  _R_true = _R.clone();
 }
 
 void CCP::readRewardFunction(string input_filename)
@@ -733,7 +973,7 @@ void CCP::readRewardFunction(string input_filename)
   if(!fs.is_open()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
 
   string str;
-  Mat p(1, _size.height * _size.width, CV_32FC(9));
+  Mat p(1, _size.height * _size.width * _nd, CV_32FC(9));
 
   int x = 0;
 
@@ -753,6 +993,44 @@ void CCP::readRewardFunction(string input_filename)
     x++;
   }
 
-  _R = p.reshape(0, _size.height).clone();
+  _R = p.clone();
 }
 
+void CCP::setUpRandomization()
+{
+  cout << "\nSetUpRandomization()\n";
+  total_pairs = 0;
+
+  _currentSampleTraj = vector<int>();
+  _currentSamplePoint = vector<int>();
+
+  for (int n=0; n<_nd; n++)
+  {
+    total_pairs += (int)_trajgt[n].size();
+  }
+
+  point_pair current;
+
+  for (int i=0; i<_samp_size; i++)
+  {
+    getRandomPair(&current);
+    _currentSampleTraj.push_back(current.trajectory);
+    _currentSamplePoint.push_back(current.data_point);
+  }
+}
+
+void CCP::getRandomPair(point_pair *result)
+{
+  int index = rand() % total_pairs;
+
+  for (int n=0; n<_nd; n++)
+  {
+    if (index < (int)_trajgt[n].size() && index >= 0) {
+      result->trajectory = n;
+      result->data_point = index;
+      return;
+    }
+
+    index -= (int)_trajgt[n].size();
+  }
+}

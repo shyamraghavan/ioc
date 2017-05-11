@@ -26,7 +26,13 @@ typedef Vec<float, 9> Vec9f;
 typedef struct par_arg {
   Mat *probs;
   int y;
+  int t;
 } par_arg;
+
+typedef struct data_point {
+  int trajectory;
+  int data_point;
+} point_pair;
 
 class CCP {
   public:
@@ -38,7 +44,7 @@ class CCP {
     void loadDemoTraj	                    (string input_file_prefix);
     void loadFeatureMaps                  (string input_file_prefix);
     void loadImages		                    (string input_file_prefix);
-    void estimatePolicy                   ();
+    void estimatePolicy                   (bool subsample);
     void estimateGamma                    ();
     void estimateTransitionMatrix         ();
     void estimateZeroValueFunction        ();
@@ -49,18 +55,26 @@ class CCP {
     void saveValueFunction                (string output_filename);
     void readValueFunction                (string input_filename);
     void saveRewardFunction               (string output_filename);
+    void saveTrueRewardFunction           ();
     void readRewardFunction               (string input_filename);
     void visualizeFeats                   ();
     void visualizeValueFunction           ();
     void visualizeRewardFunction          ();
 
-    static void estimatePolicyPoint       (CCP *i, void *arg);
+    void setUpRandomization               ();
+    void getRandomPair                    (point_pair *result);
+
+    static void estimatePolicyPoint           (CCP *i, void *arg);
+    static void estimatePolicyPointSubsample  (CCP *i, void *arg);
 
     vector < string >				      _basenames;		// file basenames
     vector < vector<cv::Point> >	_trajgt;			// ground truth trajectory
     vector < vector<cv::Point> >	_trajob;			// observed tracker output
     vector < vector<cv::Mat> >		_featmap;			// (physical) feature maps
     vector < cv::Mat >				    _image;				// (physical) feature maps
+
+    vector < int >                _currentSampleTraj;
+    vector < int >                _currentSamplePoint;
 
     cv::Mat                       _gamma;       // Gamma vector for CCP
     cv::Mat                       _gammaM;      // Gamma matrix for CCP
@@ -69,13 +83,17 @@ class CCP {
     cv::Mat                       _V0;			    // Zero Value matrix for CCP
     cv::Mat                       _V;			      // Value Function matrix for CCP
     cv::Mat                       _R;			      // Reward Function matrix for CCP
+    cv::Mat                       _R_true;      // Reward Function matrix from entire sample
 
     vector <cv::Point>				    _end;				  // terminal states
     vector <cv::Point>				    _start;				// start states
 
-    int                           _a0;          // action with 0 reward
+    cv::Point                     _a0;          // action with 0 reward
+    int                           _a0_t;        // trajectory for 0 action
     float                         _B;           // beta for CCP
     float                         _E;           // epsilon for fixed point
+    float                         _a_binwidth;  // binwidth for action differences
+    float                         _gamma_binwidth;  // binwidth for action differences
 
     int								            _nd;				  // number of training data
     int								            _nf;				  // number of training data
@@ -83,6 +101,10 @@ class CCP {
     float                         _h;           // bandwidth
     float                         _hf;          // feature bandwidth
     cv::Size					           	_size;				// current state space size
+
+    int                           _samp_size;   // subsampling sample size
+    int                           _num_samps;   // number of subsamples
+    int                           total_pairs;  // total number of data points
 
     bool							            VISUALIZE = true;
     bool							            VERBOSE = true;
