@@ -6,3 +6,6 @@ ioc:
 
 qlearn:
 	g++ -O2 -std=c++11 qlearn.cpp qlearn_main.cpp `pkg-config --cflags --libs opencv`
+
+transfer:
+	g++ -O2 -std=c++11 transfer.cpp transfer_main.cpp `pkg-config --cflags --libs opencv`

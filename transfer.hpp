@@ -21,17 +21,29 @@
 using namespace std;
 using namespace cv;
 
-class Transport {
+typedef Vec<float, 9> Vec9f;
+
+class Transfer {
   public:
-    Transport(){}
-    ~Transport(){}
+    Transfer(){}
+    ~Transfer(){}
 
     void initialize();
+    void loadPrevBasenames(string input_filename);
     void loadPrevReward(string input_filename);
-    void loadPrevFeatMap(string input_filename);
+    void loadPrevFeatMap(string input_file_prefix);
+    void reshapePrevFeatMap();
 
-    int _nd;
-    int _na;
-    int _nrow;
-    int _ncol;
+    int _prev_nd;
+    int _prev_na;
+    cv::Size _prev_size;
+
+    std::vector<string> _prev_basenames;
+    cv::Mat _prev_R;
+    std::vector<std::vector<cv::Mat>> _prev_featmap;
+    cv::Mat _prev_feats;
+
+    int _nf;
+
+    bool VERBOSE = true;
 };

@@ -1,6 +1,6 @@
 /*
  *  transport.cpp
- *  Transport to separate scene
+ *  Transfer to separate scene
  *
  *  Created by Shyam Raghavan on 05/06/17.
  *  Copyright 2017. All rights reserved.
@@ -15,7 +15,7 @@
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "transport.hpp"
+#include "transfer.hpp"
 
 void colormap(const Mat _src, Mat &dst)
 {
@@ -38,11 +38,116 @@ void colormap(const Mat _src, Mat &dst)
 	cvtColor(hsv,dst,CV_HSV2RGB_FULL);
 }
 
-void Transport::initialize()
+void Transfer::initialize()
 {
-  _nd = 14;
-  _na = 9;
+  _prev_na = 9;
+}
 
-  _nrow = 216;
-  _ncol = 384;
+void Transfer::loadPrevBasenames(string input_filename)
+{
+	cout << "\nLoadBasenames()\n";
+	ifstream fs;
+	fs.open(input_filename.c_str());
+	if(!fs.is_open()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
+	string str;
+	while(fs >> str){
+		if(str.find("#")==string::npos) _prev_basenames.push_back(str);
+	}
+	_prev_nd = (int)_prev_basenames.size();
+	if(VERBOSE) cout << "  Number of basenames loaded:" << _prev_nd << endl;
+}
+
+void Transfer::loadPrevFeatMap(string input_file_prefix)
+{
+	cout << "\nLoadPrevFeatMap()\n";
+
+	for(int i=0;i<_prev_nd;i++)
+	{
+		_prev_featmap.push_back(vector<cv::Mat>(0));
+
+		string input_filename = input_file_prefix + _prev_basenames[i] + "_feature_maps.xml";
+		FileStorage fs(input_filename.c_str(), FileStorage::READ);
+		if(!fs.isOpened()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
+
+		for(int j=0;true;j++)
+		{
+			stringstream ss;
+			ss << "feature_" << j;
+			Mat tmp;
+			fs[ss.str()] >> tmp;
+			if(!tmp.data) break;
+			_prev_featmap[i].push_back(tmp+0.0);
+		}
+		_nf = (int)_prev_featmap[i].size() - 3;
+		_prev_size = _prev_featmap[i][0].size();
+    if(VERBOSE)
+    {
+      printf(
+        "  %s: Number of features loaded is %d\n",
+        _prev_basenames[i].c_str(),
+        _nf
+      );
+      printf(
+        "  %s: State space loaded is %d x %d\n",
+        _prev_basenames[i].c_str(),
+        _prev_size.height,
+        _prev_size.width
+      );
+    }
+	}
+}
+
+void Transfer::loadPrevReward(string input_filename)
+{
+  cout << "\nLoadPrevReward()\n";
+
+  ifstream fs;
+  fs.open(input_filename.c_str());
+  if(!fs.is_open()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
+
+  string str;
+  Mat p(_prev_size.height * _prev_size.width * _prev_nd, 1, CV_32FC(9));
+
+  int x = 0;
+
+  while(getline(fs,str))
+  {
+    int a = 0;
+
+    size_t i = 0;
+    while(a < _prev_na)
+    {
+      p.at<Vec9f>(x)[a] = stof(str, &i);
+      str = str.substr(i);
+
+      a++;
+    }
+    x++;
+  }
+
+  _prev_R = p.clone();
+}
+
+void Transfer::reshapePrevFeatMap()
+{
+  cout << "\nReshapePrevFeatMap()\n";
+
+  _prev_feats = Mat(_prev_size.width * _prev_size.height * _prev_nd, _nf, CV_32FC1);
+
+  for (int t=0;t<_prev_nd;t++)
+  {
+    for (int y=0;y<_prev_size.height;y++)
+    {
+      for (int x=0;x<_prev_size.width;x++)
+      {
+        for (int f=0;f<_nf;f++)
+        {
+          int index = x + _prev_size.width * y + _prev_size.width * _prev_size.height * t;
+          float f_val = _prev_featmap[t][f].at<float>(y,x);
+
+          _prev_feats.at<float>(index,f) = f_val;
+        }
+      }
+    }
+  }
 }

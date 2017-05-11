@@ -973,7 +973,7 @@ void CCP::readRewardFunction(string input_filename)
   if(!fs.is_open()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
 
   string str;
-  Mat p(1, _size.height * _size.width * _nd, CV_32FC(9));
+  Mat p(_size.height * _size.width * _nd, 1, CV_32FC(9));
 
   int x = 0;
 
@@ -985,7 +985,7 @@ void CCP::readRewardFunction(string input_filename)
     size_t i = 0;
     while(a < 9)
     {
-      p.at<Vec9f>(0,x)[a] = stof(str, &i);
+      p.at<Vec9f>(x)[a] = stof(str, &i);
       str = str.substr(i);
 
       a++;
