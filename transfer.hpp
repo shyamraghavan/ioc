@@ -34,6 +34,8 @@ class Transfer {
     void loadPrevFeatMap(string input_file_prefix);
     void reshapePrevFeatMap();
 
+    void loadBasenames(string input_filename);
+
     int _prev_nd;
     int _prev_na;
     cv::Size _prev_size;
@@ -44,6 +46,12 @@ class Transfer {
     cv::Mat _prev_feats;
 
     int _nf;
+    int _nd;
+    int _na;
+    cv::Size _size;
+
+    std::vector<string> _basenames;
+    std::vector<std::vector<cv::Mat>> _featmap;
 
     bool VERBOSE = true;
 };

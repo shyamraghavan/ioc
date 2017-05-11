@@ -151,3 +151,17 @@ void Transfer::reshapePrevFeatMap()
     }
   }
 }
+
+void Transfer::loadBasenames(string input_filename)
+{
+	cout << "\nLoadBasenames()\n";
+	ifstream fs;
+	fs.open(input_filename.c_str());
+	if(!fs.is_open()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
+	string str;
+	while(fs >> str){
+		if(str.find("#")==string::npos) _basenames.push_back(str);
+	}
+	_nd = (int)_basenames.size();
+	if(VERBOSE) cout << "  Number of basenames loaded:" << _nd << endl;
+}
