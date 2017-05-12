@@ -25,7 +25,9 @@ int main (int argc, char * const argv[])
   exp.loadFeatMap(feat_maps_xml_path_prefix);
   exp.loadImages(rect_imag_jpg_path_prefix);
 
-  exp.visualizeFeats();
+  //exp.visualizeFeats();
+  exp.computeNewRewardFun();
+  exp.saveNewRewardFun("./ioc_demo/transfer_output/rewardfun.txt");
 
   return 0;
 }

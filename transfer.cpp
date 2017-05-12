@@ -106,22 +106,34 @@ void Transfer::loadPrevReward(string input_filename)
   if(!fs.is_open()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
 
   string str;
-  Mat p(_prev_size.height * _prev_size.width * _prev_nd, 1, CV_32FC(9));
+  Mat p(_prev_size.height * _prev_size.width * _prev_nd, 1, CV_32FC1);
 
   int x = 0;
 
   while(getline(fs,str))
   {
     int a = 0;
+    float sum = 0.0;
 
     size_t i = 0;
     while(a < _prev_na)
     {
-      p.at<Vec9f>(x)[a] = stof(str, &i);
+      float r = stof(str, &i);
+      if (r == r)
+      {
+        sum += r;
+      }
       str = str.substr(i);
 
       a++;
     }
+
+    if (sum == 0.0)
+    {
+      sum = nanf("");
+    }
+
+    p.at<float>(x) = sum / _prev_na;
     x++;
   }
 
@@ -187,7 +199,7 @@ void Transfer::loadFeatMap(string input_file_prefix)
 			if(!tmp.data) break;
 			_featmap[i].push_back(tmp+0.0);
 		}
-		_nf = (int)_featmap[i].size() - 3;
+		_nf = (int)_featmap[i].size();
 		_size = _featmap[i][0].size();
     if(VERBOSE)
     {
@@ -237,4 +249,92 @@ void Transfer::loadImages(string input_file_prefix)
 		_image.push_back(im);
 	}
 	if(VERBOSE) cout << "  Number of images loaded: " << _image.size() << endl;
+}
+
+void Transfer::computeNewRewardFunPoint(Transfer *inst, void *args)
+{
+  par_arg *arg = (par_arg *)args;
+  Mat R = *(Mat *)(arg->R);
+  int y = arg->y;
+
+  Mat mask = inst->_prev_R==inst->_prev_R;
+
+  for(int x=0;x<inst->_size.width;x++)
+  {
+    Mat pt(1,inst->_nf,CV_32FC1);
+    Mat ptf;
+    Mat err;
+
+    Point idx;
+
+    for(int f=0;f<inst->_nf;f++)
+    {
+      pt.at<float>(0,f) = inst->_featmap[0][f].at<float>(y,x);
+    }
+
+    repeat(pt,inst->_prev_size.width*inst->_prev_size.height*inst->_prev_nd,1,ptf);
+    multiply(ptf - inst->_prev_feats,ptf - inst->_prev_feats,ptf);
+    reduce(ptf,err,1,CV_REDUCE_SUM);
+    minMaxLoc(err,NULL,NULL,&idx,NULL,mask);
+
+    int index = idx.y;
+
+    R.at<float>(y * inst->_size.width + x) = inst->_prev_R.at<float>(index);
+
+    printf("Reward Function at %d %d: %f (%d)\n",
+      y, x, R.at<float>(y * inst->_size.width + x), index);
+  }
+}
+
+void Transfer::computeNewRewardFun()
+{
+  cout << "\nComputeNewRewardFun()\n";
+
+  const size_t NUM_THREADS = 16;
+
+  Mat _R(_size.height * _size.width, 1, CV_32FC1);
+  vector<thread> threads;
+  par_arg args[NUM_THREADS];
+
+  for(int y=0;y<_size.height;y+=NUM_THREADS)
+  {
+    for (int i=0;i<NUM_THREADS;i++)
+    {
+      if (y+i < _size.height)
+      {
+        args[i].y = y+i;
+        args[i].R = &_R;
+
+        threads.push_back(thread(computeNewRewardFunPoint, this, &(args[i])));
+      }
+    }
+
+    for (int i=0;i<NUM_THREADS;i++)
+    {
+      if (y+i < _size.height)
+      {
+        threads[0].join();
+        threads.erase(threads.begin());
+      }
+    }
+
+    printf("Row %d Estimation Completed\n", y);
+  }
+}
+
+void Transfer::saveNewRewardFun(string output_filename)
+{
+  cout << "\nSaveNewRewardFun()\n";
+
+  ofstream fs(output_filename.c_str());
+  if(!fs.is_open()) cout << "ERROR: Writing: " << output_filename << endl;
+  for(int y=0;y<_size.height;y++)
+  {
+    for(int x=0;x<_size.width;x++)
+    {
+      int index = x + y * _size.width;
+      fs << to_string(_R.at<float>(index)) << endl;
+    }
+  }
+  fs.close();
 }

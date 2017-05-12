@@ -23,6 +23,11 @@ using namespace cv;
 
 typedef Vec<float, 9> Vec9f;
 
+typedef struct par_arg {
+  Mat *R;
+  int y;
+} par_arg;
+
 class Transfer {
   public:
     Transfer(){}
@@ -39,6 +44,10 @@ class Transfer {
     void loadImages(string input_file_prefix);
 
     void visualizeFeats();
+
+    void computeNewRewardFun();
+    static void computeNewRewardFunPoint(Transfer *inst, void *args);
+    void saveNewRewardFun(string output_filename);
 
     int _prev_nd;
     int _prev_na;
@@ -57,6 +66,7 @@ class Transfer {
     std::vector<string> _basenames;
     std::vector<std::vector<cv::Mat>> _featmap;
     std::vector<cv::Mat> _image;
+    cv::Mat _R;
 
     bool VERBOSE = true;
     bool VISUALIZE = true;
