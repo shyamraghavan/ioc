@@ -45,7 +45,7 @@ void Transfer::initialize()
 
 void Transfer::loadPrevBasenames(string input_filename)
 {
-	cout << "\nLoadBasenames()\n";
+	cout << "\nLoadPrevBasenames()\n";
 	ifstream fs;
 	fs.open(input_filename.c_str());
 	if(!fs.is_open()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
@@ -174,17 +174,21 @@ void Transfer::loadFeatMap(string input_file_prefix)
 	{
 		_featmap.push_back(vector<cv::Mat>(0));
 
-		string input_filename = input_file_prefix + _basenames[i] + "_features.yml";
+		string input_filename = input_file_prefix + _basenames[i] + "_feature_maps.xml";
 		FileStorage fs(input_filename.c_str(), FileStorage::READ);
 		if(!fs.isOpened()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
 
-    Mat pavement;
-    fs["pavement"] >> pavement;
-    _featmap[i].push_back(feat+0.0);
-
-    _nf = 1;
-    _size = _featmap[i][0].size();
-
+		for(int j=0;true;j++)
+		{
+			stringstream ss;
+			ss << "feature_" << j;
+			Mat tmp;
+			fs[ss.str()] >> tmp;
+			if(!tmp.data) break;
+			_featmap[i].push_back(tmp+0.0);
+		}
+		_nf = (int)_featmap[i].size() - 3;
+		_size = _featmap[i][0].size();
     if(VERBOSE)
     {
       printf(
@@ -202,3 +206,35 @@ void Transfer::loadFeatMap(string input_file_prefix)
 	}
 }
 
+void Transfer::visualizeFeats()
+{
+  cout << "\nVisualizeFeats()\n";
+
+  for(int f=0;f<_nf;f++)
+  {
+    if(VISUALIZE)
+    {
+      Mat dst;
+      colormap(_featmap[0][f],dst);
+      addWeighted(_image[0],0.5,dst,0.5,0,dst);
+      imshow("Feature " + to_string(f),dst);
+      waitKey(0);
+    }
+  }
+}
+
+void Transfer::loadImages(string input_file_prefix)
+{
+	cout << "\nLoadImages()\n";
+
+	for(int i=0;i<_nd;i++)
+	{
+		string input_filename = input_file_prefix + _basenames[i] + "_birdseye.jpg";
+		Mat im = imread(input_filename);
+		if(!im.data){cout << "ERROR: Opening:" << input_filename << endl; exit(1);}
+		if(VERBOSE) cout << "  Loading: " << input_filename << endl;
+		resize(im,im,_featmap[0][0].size());
+		_image.push_back(im);
+	}
+	if(VERBOSE) cout << "  Number of images loaded: " << _image.size() << endl;
+}

@@ -36,6 +36,9 @@ class Transfer {
 
     void loadBasenames(string input_filename);
     void loadFeatMap(string input_file_prefix);
+    void loadImages(string input_file_prefix);
+
+    void visualizeFeats();
 
     int _prev_nd;
     int _prev_na;
@@ -53,6 +56,8 @@ class Transfer {
 
     std::vector<string> _basenames;
     std::vector<std::vector<cv::Mat>> _featmap;
+    std::vector<cv::Mat> _image;
 
     bool VERBOSE = true;
+    bool VISUALIZE = true;
 };

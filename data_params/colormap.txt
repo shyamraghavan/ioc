@@ -1,0 +1,15 @@
+0 pavement 24 116 205
+1 sidewalk 107 142 35
+2 person 255 0 0
+3 car 255 255 0
+4 building 200 200 50
+5 vobj 255 140 0
+6 grass 0 255 0
+7 curb 0 0 255
+8 fence 200 0 200
+9 gravel 50 100 50
+10 tree 25 190 0
+11 statue 0 0 0
+12 cart 0 0 0
+13 bike 0 0 0
+14 wall 0 0 0

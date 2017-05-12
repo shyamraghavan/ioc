@@ -11,6 +11,7 @@ int main (int argc, char * const argv[])
 
 	string basenames_txt_path        = "./ioc_demo/transfer_basename_1.txt";
 	string feat_maps_xml_path_prefix = "./ioc_demo/transfer_feat/";
+	string rect_imag_jpg_path_prefix = "./ioc_demo/transfer_imag/";
 
   Transfer exp;
 
@@ -22,6 +23,9 @@ int main (int argc, char * const argv[])
 
   exp.loadBasenames(basenames_txt_path);
   exp.loadFeatMap(feat_maps_xml_path_prefix);
+  exp.loadImages(rect_imag_jpg_path_prefix);
+
+  exp.visualizeFeats();
 
   return 0;
 }
