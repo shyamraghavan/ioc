@@ -41,7 +41,6 @@ void colormap(const Mat _src, Mat &dst)
 void CCP::initialize()
 {
   _na = 9;
-  _h = 2;
   _hf = 1;
 
   _a0 = Point(80,130);

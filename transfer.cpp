@@ -280,9 +280,6 @@ void Transfer::computeNewRewardFunPoint(Transfer *inst, void *args)
     int index = idx.y;
 
     R.at<float>(y * inst->_size.width + x) = inst->_prev_R.at<float>(index);
-
-    printf("Reward Function at %d %d: %f (%d)\n",
-      y, x, R.at<float>(y * inst->_size.width + x), index);
   }
 }
 
@@ -317,8 +314,6 @@ void Transfer::computeNewRewardFun()
         threads.erase(threads.begin());
       }
     }
-
-    printf("Row %d Estimation Completed\n", y);
   }
 }
 

@@ -98,7 +98,6 @@ class CCP {
     int								            _nd;				  // number of training data
     int								            _nf;				  // number of training data
     int								            _na;				  // number of actions [3x3]
-    float                         _h;           // bandwidth
     float                         _hf;          // feature bandwidth
     cv::Size					           	_size;				// current state space size
 
