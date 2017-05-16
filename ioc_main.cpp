@@ -20,7 +20,8 @@ int main (int argc, char * const argv[])
 	model.loadFeatureMaps	(feat_maps_xml_path_prefix);
 	model.loadImages		  (rect_imag_jpg_path_prefix);
 
-	model.initialize		(false, true);
+  // verbose, visualize, save_visualize
+	model.initialize		(false, true, true);
 
   if(use_cached_weights) {
     model.loadWeights(load_params_path);

@@ -147,12 +147,14 @@ void IOC::computeEmpiricalStatistics()
 }
 
 
-void IOC::initialize(bool verbose, bool visualize)
+void IOC::initialize(bool verbose, bool visualize, bool save_visualization)
 {
 	cout << "\nInitialize()\n";
 
 	VISUALIZE = visualize;						// visualization flag
 	VERBOSE = verbose;							// print out intermediate status
+  SAVE_VISUALIZATION = save_visualization;  // Save visualization results
+
 	DELTA = 0.01;								// minimum improvement in loglikelihood
 	_lambda = 0.01;								// initial step size
 
@@ -287,6 +289,16 @@ void IOC::computeStateVisDist(vector<Mat> pax,Point start,Point end,Mat img, Mat
 
 		if(n++>300) break;
 	}
+
+  if (SAVE_VISUALIZATION) {
+    // calculating dsp might be redundant but doesn't matter much.
+		colormap_CumilativeProb(D,dsp);
+		img.copyTo(dsp,dsp<1);
+		addWeighted(dsp,0.5,img,0.5,0,dsp);
+    imwrite("forecast_distribution.png", dsp);
+    cout << "Did save file: " << "forecast_distribution.png" << endl;
+  }
+
 	return;
 }
 
@@ -462,6 +474,10 @@ void IOC::computeRewardFunction(int data_i)
 		colormap(_R[data_i],dst);
 		addWeighted(_image[data_i],0.5,dst,0.5,0,dst);
 		imshow("Reward Function",dst);
+    if (SAVE_VISUALIZATION) {
+      imwrite("./reward_function.png", dst);
+      cout << "Did save file: " << "reward_function.png" << endl;
+    }
 		waitKey(1);
 	}
 }
@@ -544,6 +560,14 @@ void IOC::computeSoftValueFunc(Mat R, Point end, Mat img, Mat &VF)
 
 		if(n>1000){cout << "ERROR: Max number of iterations." << endl;_error=1;return;}
 	}
+
+  if (SAVE_VISUALIZATION) {
+		Mat dst;
+		colormap(V[0],dst);
+		addWeighted(img,0.5,dst,0.5,0,dst);
+    imwrite("max_ent_value_function.png", dst);
+    cout << "Did save file: " << "max_ent_value_function.png" << endl;
+  }
 
 	V[0].copyTo(VF);
 
