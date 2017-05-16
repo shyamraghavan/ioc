@@ -12,3 +12,6 @@ transfer:
 
 prep:
 	cd prep && g++ -O2 -std=c++11 -o prep.o prepUMD.cpp prep.cpp `pkg-config --cflags --libs opencv`
+
+hioc:
+	g++ -O2 -std=c++11 trainHIOC.cpp -o trainHIOC.o hioc_main.cpp `pkg-config --cflags --libs opencv`
