@@ -31,6 +31,7 @@ public:
 	void loadDemoTraj	(string input_file_prefix);
 	void loadFeatureMaps(string input_file_prefix);
 	void loadImages		(string input_file_prefix);
+  void loadWeights(string input_filename);
 
 	void computeEmpiricalStatistics();
 	void initialize(bool verbose,bool visualize);

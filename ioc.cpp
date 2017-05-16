@@ -107,6 +107,20 @@ void IOC::loadImages		(string input_file_prefix)
 	if(VERBOSE) cout << "  Number of images loaded: " << _image.size() << endl;
 }
 
+void IOC::loadWeights(string input_filename) {
+  cout << "\nLoadWeights: " << input_filename << endl;
+  ifstream fs;
+
+	fs.open(input_filename.c_str());
+	if(!fs.is_open()){cout << "ERROR: Opening: " << input_filename << endl;exit(1);}
+	string str;
+  int i = 0;
+	while(fs >> str){
+    _w[i++] = std::stof(str);
+	}
+	if(VERBOSE) cout << "  Weightes loaded:" << endl;
+}
+
 
 void IOC::computeEmpiricalStatistics()
 {
@@ -186,7 +200,7 @@ void IOC::backwardPass()
 		if(_loglikelihood <= -FLT_MAX) break;
 	}
 
-	cout << "  LogLikelihood SUM: " << _loglikelihood << endl;
+	cout << "  LogLikelihood SUM: " << _loglikelihood << " mean: " << _loglikelihood/_nd << endl;
 }
 
 
