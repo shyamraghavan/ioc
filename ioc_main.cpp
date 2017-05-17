@@ -5,11 +5,13 @@ using namespace std;
 int main (int argc, char * const argv[])
 {
 
-	string basenames_txt_path		 = "./ioc_demo/walk_basenames.txt";
+	string basenames_txt_path		     = "./ioc_demo/walk_basenames.txt";
 	string demontraj_txt_path_prefix = "./ioc_demo/walk_traj/";
 	string feat_maps_xml_path_prefix = "./ioc_demo/walk_feat/";
 	string rect_imag_jpg_path_prefix = "./ioc_demo/walk_imag/";
-	string output_params_path		 = "./ioc_demo/walk_output/walk_reward_params.txt";
+	string output_params_path		     = "./ioc_demo/mohit_output/walk_reward_params.txt";
+  string load_params_path          = "./ioc_demo/mohit_output/ioc_output_1/walk_reward_params.txt";
+  bool use_cached_weights          = true;
 
 	IOC model;
 
@@ -18,7 +20,12 @@ int main (int argc, char * const argv[])
 	model.loadFeatureMaps	(feat_maps_xml_path_prefix);
 	model.loadImages		  (rect_imag_jpg_path_prefix);
 
-	model.initialize		(false,false);
+  // verbose, visualize, save_visualize
+	model.initialize		(false, true, true);
+
+  if(use_cached_weights) {
+    model.loadWeights(load_params_path);
+  }
 
 	model.computeEmpiricalStatistics();
 

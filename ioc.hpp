@@ -31,9 +31,10 @@ public:
 	void loadDemoTraj	(string input_file_prefix);
 	void loadFeatureMaps(string input_file_prefix);
 	void loadImages		(string input_file_prefix);
+  void loadWeights(string input_filename);
 
 	void computeEmpiricalStatistics();
-	void initialize(bool verbose,bool visualize);
+	void initialize(bool verbose, bool visualize, bool save_visualization);
 
 	void backwardPass		();
 	void forwardPass		();
@@ -77,6 +78,7 @@ private:
 
 	bool							            VISUALIZE;
 	bool							            VERBOSE;
+  bool                          SAVE_VISUALIZATION;
 	float							            DELTA;
 
 	void accumilateEmpiricalFeatureCounts(int data_i, cv::Point pt);

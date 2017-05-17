@@ -191,6 +191,10 @@ void CCP::estimatePolicyPoint(CCP *inst, void *args)
       if(a == 7) { dx=0; dy=1; }
       if(a == 8) { dx=1; dy=1; }
 
+      if ((y + dy) < 0 || (x + dx) < 0) {
+        continue;
+      }
+
       for(int i=0;i<inst->_nd;i++)
       {
         vector<Point> trajgt = inst->_trajgt[i];
