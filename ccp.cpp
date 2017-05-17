@@ -43,6 +43,8 @@ void CCP::initialize()
   _na = 9;
   _hf = 1;
 
+  _euler = 0.5772156649015328606065120;
+
   _a0 = Point(80,130);
   _a0_t = 0;
   _B = .95;
@@ -521,9 +523,13 @@ void CCP::estimateGamma()
             float n = _probs.at<Vec9f>(index)[a];
             float d = _probs.at<Vec9f>(index)[min_a];
 
+            if(a == min_a)
+            {
+              continue;
+            }
             if(d != 0)
             {
-              val += log(1.0 + n/d);
+              val += n/d;
             } else {
               val = nanf("");
             }
@@ -532,7 +538,7 @@ void CCP::estimateGamma()
           val = nanf("");
         }
 
-        gamma.push_back(val);
+        gamma.push_back(log(1.0 + val) + _euler);
       }
     }
   }

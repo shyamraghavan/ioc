@@ -105,6 +105,8 @@ class CCP {
     int                           _num_samps;   // number of subsamples
     int                           total_pairs;  // total number of data points
 
+    float                         _euler;       // euler's constant
+
     bool							            VISUALIZE = true;
     bool							            VERBOSE = true;
 };
