@@ -374,7 +374,7 @@ void IOC::computeTrajLikelihood	(vector<Mat> pax, vector<Point> trajgt, float &l
 
 	if(VERBOSE) cout << "    loglikelihood: " << ll << endl;
 
-	loglikelihood += ll;
+	loglikelihood += (ll / ((int)trajgt.size()-1));
 }
 
 void IOC::gradientUpdate()

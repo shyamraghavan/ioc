@@ -483,6 +483,10 @@ void CCP::estimateGamma()
           if(a == 7) { dx=0; dy=1; }
           if(a == 8) { dx=1; dy=1; }
 
+          if ((x + dx) < 0 || (y + dy) < 0) {
+            continue;
+          }
+
           for(int f=0;f<_nf;f++)
           {
             afv.push_back(_featmap[t][f].at<float>(y+dy,x+dx));
@@ -602,6 +606,10 @@ void CCP::estimateTransitionMatrix()
           if(a == 6) { dx=-1; dy=1; }
           if(a == 7) { dx=0; dy=1; }
           if(a == 8) { dx=1; dy=1; }
+
+          if ((x + dx) < 0 || (y + dy) < 0) {
+            continue;
+          }
 
           for(int f=0;f<_nf;f++)
           {
@@ -756,6 +764,10 @@ void CCP::estimateValueFunction()
           if(a == 6) { dx=-1; dy=1; }
           if(a == 7) { dx=0; dy=1; }
           if(a == 8) { dx=1; dy=1; }
+
+          if ((x + dx) < 0 || (y + dy) < 0) {
+            continue;
+          }
 
           for(int f=0;f<_nf;f++)
           {

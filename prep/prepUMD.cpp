@@ -148,6 +148,15 @@ void prepUMD::prepare_trajectory_features()
 		for(int i=0;i<(int)obs.size();i++) ofs << floor(obs[i].x*_nc) << " " << floor(obs[i].y*_nr) << endl;
 		ofs.close();
 
+    ss.str("");
+    ss << _root + "/trajectories/" + fileid + "_tracker_output.txt";
+    ofs.open(ss.str().c_str());
+    for(int i=0; i < (int)gtt.size(); i++)  {
+      ofs << i << "\t" << floor(gtt[i].x*_nc) << "\t" << floor(gtt[i].y*_nr) << "\t"
+        << floor(obs[i].x*_nc) << "\t" << floor(obs[i].y*_nr) << endl;
+    }
+    ofs.close();
+
 	}
 
 }
@@ -190,12 +199,14 @@ void prepUMD::prepare_static_features()
 
 		ss.str("");
 		ss << _root + "/ioc_demo/transfer_feat/" + fileid + "_features.yml";
+		//ss << _root + "/walk_feat/" + fileid + "_features.yml";
 		cout << "Opening: " << ss.str() << endl;
 
 		FileStorage fs(ss.str(),FileStorage::READ);
 
     ss.str("");
     ss << _root + "/ioc_demo/transfer_feat/" + fileid + "_feature_maps.xml";
+    //ss << _root + "/walk_feat/" + fileid + "_feature_maps.xml";
     FileStorage fsw(ss.str(),FileStorage::WRITE);
 
     Mat im, tmp, sm;
