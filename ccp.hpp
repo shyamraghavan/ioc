@@ -61,6 +61,9 @@ class CCP {
     void visualizeFeats                   ();
     void visualizeValueFunction           ();
     void visualizeRewardFunction          ();
+    void computeStateVisDist              ();
+    void computeStateVisDistForTrajectory (int t, Point start, Point end, Mat img, Mat &D);
+    void colormap_CumilativeProb          (Mat src, Mat &dst);
 
     void setUpRandomization               ();
     void getRandomPair                    (point_pair *result);
