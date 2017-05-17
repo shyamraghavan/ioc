@@ -1022,7 +1022,7 @@ void CCP::readRewardFunction(string input_filename)
 void CCP::estimateLikelihood() {
 
   if (VERBOSE) {
-    cout << "EstimateLikelihood()" << endl;
+    cout << "\nEstimateLikelihood()" << endl;
   }
 
   float total_ll = 0;
@@ -1037,8 +1037,8 @@ void CCP::estimateLikelihood() {
     for (int t=0; t < traj.size() - 1; t++) {
       int dx = traj[t+1].x - traj[t].x;
       int dy = traj[t+1].y - traj[t].y;
-      
-      int a = getActionForMovement(dx, dy);  
+
+      int a = getActionForMovement(dx, dy);
       if (a < 0) {
         printf("ERROR: Invalid action %d(%d,%d)\n" ,t, dx, dy);
         printf("Preprocess trajectory data properly.\n");
@@ -1048,8 +1048,7 @@ void CCP::estimateLikelihood() {
 		  // float val = log(pax[a].at<float>(trajgt[t].y,trajgt[t].x));
       float x = traj[t].x;
       float y = traj[t].y;
-      float temp_t = 0; // or _nd - 1
-      int index = x + y * _size.width + temp_t * (_size.width * _size.height);
+      int index = x + y * _size.width + i * (_size.width * _size.height);
       float val = log(policy.at<Vec9f>(index)[a]);
 
       if (val < -FLT_MAX) {
