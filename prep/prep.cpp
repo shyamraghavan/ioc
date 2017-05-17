@@ -15,9 +15,10 @@ int main (int argc, char * const argv[])
   string basenames_txt_path = "/walk_basenames.txt";
 
   pu.set(root.c_str(),394,216);
-  pu.load_basenames(basenames_txt_path);
-  //pu.prepare_static_features();
-  pu.prepare_trajectory_features();
+  pu.load_basenames(vidseg_info_fp);
+  //pu.load_basenames(basenames_txt_path);
+  pu.prepare_static_features();
+  //pu.prepare_trajectory_features();
 
 	return 0;
 }
