@@ -1,5 +1,5 @@
 ccp:
-	g++ -O2 -lpthread -std=c++11 -o ccp.o ccp.cpp ccp_main.cpp `pkg-config --cflags --libs opencv`
+	g++ -g -O0 -lpthread -std=c++11 -o ccp.o ccp.cpp ccp_main.cpp `pkg-config --cflags --libs opencv`
 
 ioc:
 	g++ -O2 -lpthread -std=c++11 -o ioc.o ioc.cpp ioc_main.cpp `pkg-config --cflags --libs opencv`
