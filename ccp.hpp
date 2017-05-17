@@ -50,6 +50,7 @@ class CCP {
     void estimateZeroValueFunction        ();
     void estimateValueFunction            ();
     void estimateRewardFunction           ();
+    void estimateLikelihood();
     void savePolicy                       (string output_filename);
     void readPolicy                       (string input_filename);
     void saveValueFunction                (string output_filename);
@@ -63,6 +64,7 @@ class CCP {
 
     void setUpRandomization               ();
     void getRandomPair                    (point_pair *result);
+    int  getActionForMovement        (int dx, int dy);
 
     static void estimatePolicyPoint           (CCP *i, void *arg);
     static void estimatePolicyPointSubsample  (CCP *i, void *arg);
