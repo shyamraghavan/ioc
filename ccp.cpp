@@ -340,7 +340,9 @@ void CCP::estimatePolicy(bool subsample)
       {
         vector<Mat> actionProbs(9);
         split(_probs, actionProbs);
-        Mat act = actionProbs[0].rowRange((_size.width * _size.height) * t,(_size.width * _size.height) * (t + 1)).reshape(0, _size.height);
+        Mat act = actionProbs[0].rowRange(
+            (_size.width * _size.height) * t,
+            (_size.width * _size.height) * (t + 1)).reshape(0, _size.height);
 
         Mat dst;
         colormap(act,dst);
@@ -1017,6 +1019,58 @@ void CCP::readRewardFunction(string input_filename)
   _R = p.clone();
 }
 
+void CCP::estimateLikelihood() {
+
+  if (VERBOSE) {
+    cout << "EstimateLikelihood()" << endl;
+  }
+
+  float total_ll = 0;
+  float ll_per_length = 0;
+
+  cv::Mat policy = _probs.clone();
+
+  for (int i=0; i < _nd; i++) {
+    vector<cv::Point> traj = _trajgt[i];
+
+    float ll = 0;
+    for (int t=0; t < traj.size() - 1; t++) {
+      int dx = traj[t+1].x - traj[t].x;
+      int dy = traj[t+1].y - traj[t].y;
+      
+      int a = getActionForMovement(dx, dy);  
+      if (a < 0) {
+        printf("ERROR: Invalid action %d(%d,%d)\n" ,t, dx, dy);
+        printf("Preprocess trajectory data properly.\n");
+        exit(1);
+      }
+
+		  // float val = log(pax[a].at<float>(trajgt[t].y,trajgt[t].x));
+      float x = traj[t].x;
+      float y = traj[t].y;
+      float temp_t = 0; // or _nd - 1
+      int index = x + y * _size.width + temp_t * (_size.width * _size.height);
+      float val = log(policy.at<Vec9f>(index)[a]);
+
+      if (val < -FLT_MAX) {
+        ll = -FLT_MAX;
+        cout << "Got less than -infinity LogLikelihood" << endl;
+        break;
+      }
+
+      ll += val;
+
+    }
+
+    if(VERBOSE) cout << "    loglikelihood: " << ll << endl;
+    total_ll += ll;
+    ll_per_length += (ll / (int)traj.size());
+  }
+
+  printf("Total LogLikelihood %.3f, Log likelihood per trajectory: %.3f\n",
+      total_ll / _nd, ll_per_length / _nd);
+}
+
 void CCP::setUpRandomization()
 {
   cout << "\nSetUpRandomization()\n";
@@ -1055,3 +1109,19 @@ void CCP::getRandomPair(point_pair *result)
     index -= (int)_trajgt[n].size();
   }
 }
+
+int CCP::getActionForMovement(int dx, int dy) {
+  if( dx==-1 && dy==-1 ) return 0;
+  if( dx== 0 && dy==-1 ) return 1;
+  if( dx== 1 && dy==-1 ) return 2;
+
+  if( dx==-1 && dy== 0 ) return 3;
+  if( dx== 0 && dy== 0 ) return -1;	// stopping prohibited
+  if( dx== 1 && dy== 0 ) return 5;
+
+  if( dx==-1 && dy== 1 ) return 6;
+  if( dx== 0 && dy== 1 ) return 7;
+  if( dx== 1 && dy== 1 ) return 8;
+  else return 10000;
+}
+

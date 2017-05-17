@@ -20,9 +20,10 @@ int main (int argc, char * const argv[])
   model.loadImages      (rect_imag_jpg_path_prefix);
   //model.visualizeFeats  ();
 
-  //model.readPolicy("./ioc_demo/walk_output/policy.txt");
-  model.estimatePolicy(false);
-  model.savePolicy("./ioc_demo/mohit_output/ccp_output_1/policy.txt");
+  model.readPolicy("./ioc_demo/mohit_output/ccp_output_1/policy.txt");
+  //model.estimatePolicy(false);
+  //model.savePolicy("./ioc_demo/mohit_output/ccp_output_1/policy.txt");
+  model.estimateLikelihood();
 
   model.estimateGamma();
   model.estimateTransitionMatrix();
