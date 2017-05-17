@@ -94,6 +94,7 @@ void prepUMD::prepare_trajectory_features()
 		gtt.erase(gtt.end()-k,gtt.end());
 		obs.erase(obs.end()-k,obs.end());
 
+    cout << _basename[i] << endl;
 		if(gtt.size()!=obs.size()) cout << "ERROR2: GT and OBS lengths do not match!" << endl;
 
 		///////////////////////////////////////////////
