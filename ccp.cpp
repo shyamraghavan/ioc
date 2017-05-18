@@ -226,9 +226,6 @@ void CCP::estimatePolicyPoint(CCP *inst, void *args)
           numerator += include ? exp(-total_exp / 2.0) : 0;
         }
       }
-      int index = x + y * inst->_size.width + t * (inst->_size.width * inst->_size.height);
-      probs.at<Vec9f>(index)[a] = numerator;
-    }
 
       state_probs.push_back(numerator);
     }
