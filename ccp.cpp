@@ -41,7 +41,7 @@ void colormap(const Mat _src, Mat &dst)
 void CCP::initialize()
 {
   _na = 9;
-  _hf = 1;
+  _hf = 0.003;
 
   _euler = 0.5772156649015328606065120;
 
@@ -50,7 +50,7 @@ void CCP::initialize()
   _B = .95;
   _E = 0.0000000001;
 
-  _a_binwidth = 0.3;
+  _a_binwidth = 0.003;
   _gamma_binwidth = 1;
 
   _samp_size = 100;
@@ -176,10 +176,12 @@ void CCP::estimatePolicyPoint(CCP *inst, void *args)
 
   for(int x=0;x<inst->_size.width;x+=1)
   {
+    vector<float> state_probs;
+    float denominator = 0.0;
+
     for(int a=0;a<inst->_na;a++)
     {
       float numerator = 0.0;
-      float denominator = 0.0;
 
       int dx,dy;
 
@@ -187,7 +189,7 @@ void CCP::estimatePolicyPoint(CCP *inst, void *args)
       if(a == 1) { dx=0; dy=-1; }
       if(a == 2) { dx=1; dy=-1; }
       if(a == 3) { dx=-1; dy=0; }
-      if(a == 4) { continue; }
+      if(a == 4) { dx=0; dy=0; }
       if(a == 5) { dx=1; dy=0; }
       if(a == 6) { dx=-1; dy=1; }
       if(a == 7) { dx=0; dy=1; }
@@ -211,8 +213,7 @@ void CCP::estimatePolicyPoint(CCP *inst, void *args)
 
           for(int f=0;f<inst->_nf;f++)
           {
-            float feat =
-              inst->_featmap[i][f].at<float>(x_cur) -
+            float feat = inst->_featmap[i][f].at<float>(x_cur) -
               inst->_featmap[t][f].at<float>(y,x);
             total_exp += pow(feat / inst->_hf, 2.0);
 
@@ -221,13 +222,20 @@ void CCP::estimatePolicyPoint(CCP *inst, void *args)
                   inst->_featmap[i][f].at<float>(x_next)) < inst->_a_binwidth;
           }
 
+          denominator += include ? exp(-total_exp / 2.0) : 0;
           numerator += include ? exp(-total_exp / 2.0) : 0;
-          denominator += exp(-total_exp / 2.0);
         }
       }
 
+      state_probs.push_back(numerator);
+    }
+
+    for(int a=0;a<inst->_na;a++)
+    {
+      float numerator = state_probs[a];
+
       int index = x + y * inst->_size.width + t * (inst->_size.width * inst->_size.height);
-      probs.at<Vec9f>(index)[a] = numerator / denominator;
+      probs.at<Vec9f>(index)[a] = denominator != 0 ? numerator / denominator : nanf("");
     }
   }
 
@@ -1046,8 +1054,8 @@ void CCP::estimateLikelihood() {
       }
 
 		  // float val = log(pax[a].at<float>(trajgt[t].y,trajgt[t].x));
-      float x = traj[t].x;
-      float y = traj[t].y;
+      int x = traj[t].x;
+      int y = traj[t].y;
       int index = x + y * _size.width + i * (_size.width * _size.height);
       float val = log(policy.at<Vec9f>(index)[a]);
 
