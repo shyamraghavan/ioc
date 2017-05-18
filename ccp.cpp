@@ -1078,6 +1078,53 @@ void CCP::estimateLikelihood() {
       total_ll / _nd, ll_per_length / _nd);
 }
 
+void CCP::estimateTrajectory() {
+  for (int i = 0; i < _nd; i++) {
+    vector<cv::Point> estimatedTraj;
+    reconstructTrajectory(i, _start[i], _end[i], _trajgt[i], estimatedTraj);
+
+    printf(" ====== Recons Trajectory results ==========\n");
+    for (int t=0; t < _trajgt[i].size(); t++) {
+      printf("org: (%d, %d), pred: (%d, %d)\n",
+          (int)_trajgt[i][t].x, (int)_trajgt[i][t].y,
+          (int)estimatedTraj[t].x, (int)estimatedTraj[t].y);
+    }
+    printf(" ================ ");
+  }
+}
+
+bool areSame(float a, float b) {
+    return fabs(a - b) < 0.000001;
+}
+
+void CCP::reconstructTrajectory(int d, Point start, Point end, vector<cv::Point> traj,
+    vector<cv::Point> &estimatedTraj) {
+  int i = 0;
+  float x = start.x;
+  float y = start.y;
+
+  while (i++ < traj.size() && !(areSame(x, end.x) && areSame(y, end.y))) {
+
+    estimatedTraj.push_back(cv::Point(x, y));
+
+    int index = x + y * _size.width + d * (_size.width * _size.height);
+    Vec9f prob_actions = _probs.at<Vec9f>(index);
+    int max_action_idx = 0;
+    for (int a = 1; a < 9; a++) {
+      if (a == 4) {
+        continue;
+      }
+      if (prob_actions[a] > prob_actions[max_action_idx]) {
+        max_action_idx = a;
+      }
+    }
+    // Found the action to take
+    Point dxdy = getMovementForAction(max_action_idx);
+    x += dxdy.x;
+    y += dxdy.y;
+  }
+}
+
 void CCP::computeStateVisDist() {
   if (VERBOSE) cout << "\ncomputeStateViDist" << endl;
   for (int i = 0; i < _nd; i++) {
@@ -1120,12 +1167,12 @@ void CCP::computeStateVisDistForTrajectory(int t, Point start, Point end, Mat im
           int index = col + row * N[0].cols + t * N[0].rows * N[0].cols;
 
 					if (col>0	&& row>0) {
-            N[1].at<float>(row-1,col-1) += 
+            N[1].at<float>(row-1,col-1) +=
               N[0].at<float>(row,col) * _probs.at<Vec9f>(index)[0];	// NW
           }
 
 					if (row > 0) {
-            N[1].at<float>(row-1,col-0) += 
+            N[1].at<float>(row-1,col-0) +=
               N[0].at<float>(row,col) * _probs.at<Vec9f>(index)[1];	// N
           }
 
@@ -1135,7 +1182,7 @@ void CCP::computeStateVisDistForTrajectory(int t, Point start, Point end, Mat im
           }
 
 					if (col > 0) {
-            N[1].at<float>(row-0,col-1) += 
+            N[1].at<float>(row-0,col-1) +=
               N[0].at<float>(row,col) * _probs.at<Vec9f>(index)[3];	// W
           }
 					if (col < col_1) {
@@ -1149,7 +1196,7 @@ void CCP::computeStateVisDistForTrajectory(int t, Point start, Point end, Mat im
           }
 
 					if (row < row_1) {
-            N[1].at<float>(row+1,col-0) += 
+            N[1].at<float>(row+1,col-0) +=
               N[0].at<float>(row,col) * _probs.at<Vec9f>(index)[7];	// S
           }
 					if (col < col_1 && row < row_1) {
@@ -1171,7 +1218,7 @@ void CCP::computeStateVisDistForTrajectory(int t, Point start, Point end, Mat im
 			colormap_CumilativeProb(D,dsp);
 			img.copyTo(dsp,dsp<1);
 			addWeighted(dsp,0.5,img,0.5,0,dsp);
-			imshow("Forecast Distribution",dsp);
+			imshow("Forecast Distribution" + to_string(t), dsp);
 			waitKey(1);
 		}
 
@@ -1183,7 +1230,7 @@ void CCP::computeStateVisDistForTrajectory(int t, Point start, Point end, Mat im
 		colormap_CumilativeProb(D,dsp);
 		img.copyTo(dsp,dsp<1);
 		addWeighted(dsp,0.5,img,0.5,0,dsp);
-    imwrite("forecast_distribution.png", dsp);
+    imwrite("forecast_distribution_" + to_string(t) + ".png", dsp);
     cout << "Did save file: " << "forecast_distribution.png" << endl;
   }
 }
@@ -1241,6 +1288,22 @@ int CCP::getActionForMovement(int dx, int dy) {
   if( dx== 1 && dy== 1 ) return 8;
   else return 10000;
 }
+
+Point CCP::getMovementForAction(int action) {
+  if (action == 0) return Point(-1, -1);
+  if (action == 1) return Point(0, -1);
+  if (action == 2) return Point(1, -1);
+  if (action == 3) return Point(-1, 0);
+  if (action == 4) assert(2 > 3);
+  if (action == 5) return Point(1, 0);
+  if (action == 6) return Point(-1, 1);
+  if (action == 7) return Point(0, 1);
+  if (action == 8) return Point(1, 1);
+
+  assert(2 > 3);
+  return Point(-10000, -10000);
+}
+
 
 void CCP::colormap_CumilativeProb(Mat src, Mat &dst) {
 	if(src.type()!=CV_32FC1) cout << "ERROR(jetmap): must be single channel float\n";
