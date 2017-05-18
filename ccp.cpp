@@ -1070,6 +1070,116 @@ void CCP::estimateLikelihood() {
       total_ll / _nd, ll_per_length / _nd);
 }
 
+void CCP::computeStateVisDist() {
+  if (VERBOSE) cout << "\ncomputeStateViDist" << endl;
+  for (int i = 0; i < _nd; i++) {
+    Mat D;
+    computeStateVisDistForTrajectory(i, _start[i], _end[i], _image[i], D);
+  }
+}
+
+void CCP::computeStateVisDistForTrajectory(int t, Point start, Point end, Mat img, Mat &D) {
+
+  if (VERBOSE) cout << "\ncomputeStateViDistForTrajectory" << endl;
+
+  Mat N[2];
+
+	N[0] = Mat::zeros(_size,CV_32FC1);
+	N[1] = Mat::zeros(_size,CV_32FC1);
+	N[0].at<float>(start.y,start.x) = 1.0;					// initialize start
+
+	D = Mat::zeros(_size,CV_32FC1);
+
+	D += N[0];
+
+	Mat dsp;
+
+	int n=0;
+
+
+	while(1) {
+		N[1] *= 0.0;
+		for(int col = 0; col < N[0].cols; col++) {
+			for(int row = 0; row < N[0].rows; row++) {
+				if(row == end.y && col == end.x) continue;		// absorbsion state
+
+        // ignore small probabilities
+				if(N[0].at<float>(row,col) > (FLT_MIN)) {
+
+					int col_1 = N[1].cols - 1;
+					int row_1 = N[1].rows - 1;
+
+          int index = col + row * N[0].cols + t * N[0].rows * N[0].cols;
+
+					if (col>0	&& row>0) {
+            N[1].at<float>(row-1,col-1) += 
+              N[0].at<float>(row,col) * _probs.at<Vec9f>(index)[0];	// NW
+          }
+
+					if (row > 0) {
+            N[1].at<float>(row-1,col-0) += 
+              N[0].at<float>(row,col) * _probs.at<Vec9f>(index)[1];	// N
+          }
+
+					if (col < col_1 && row > 0) {
+            N[1].at<float>(row-1,col+1) +=
+              N[0].at<float>(row,col) * _probs.at<Vec9f>(index)[2];	// NE
+          }
+
+					if (col > 0) {
+            N[1].at<float>(row-0,col-1) += 
+              N[0].at<float>(row,col) * _probs.at<Vec9f>(index)[3];	// W
+          }
+					if (col < col_1) {
+            N[1].at<float>(row-0,col+1) +=
+              N[0].at<float>(row,col) * _probs.at<Vec9f>(index)[5];	// E
+          }
+
+					if ( col > 0 && row < row_1) {
+            N[1].at<float>(row+1, col-1) +=
+              N[0].at<float>(row,col) * _probs.at<Vec9f>(index)[6];	// SW
+          }
+
+					if (row < row_1) {
+            N[1].at<float>(row+1,col-0) += 
+              N[0].at<float>(row,col) * _probs.at<Vec9f>(index)[7];	// S
+          }
+					if (col < col_1 && row < row_1) {
+            N[1].at<float>(row+1,col+1) +=
+              N[0].at<float>(row,col) * _probs.at<Vec9f>(index)[8];	// SE
+          }
+				}
+			}
+		}
+
+		N[1].at<float>(end.y,end.x) = 0.0;				// absorption state
+
+		swap(N[0],N[1]);
+
+		D += N[0];										// update state visitation distribution
+
+		if(VISUALIZE)
+		{
+			colormap_CumilativeProb(D,dsp);
+			img.copyTo(dsp,dsp<1);
+			addWeighted(dsp,0.5,img,0.5,0,dsp);
+			imshow("Forecast Distribution",dsp);
+			waitKey(1);
+		}
+
+		if(n++>300) break;
+	}
+
+  if (VISUALIZE) {
+    // calculating dsp might be redundant but doesn't matter much.
+		colormap_CumilativeProb(D,dsp);
+		img.copyTo(dsp,dsp<1);
+		addWeighted(dsp,0.5,img,0.5,0,dsp);
+    imwrite("forecast_distribution.png", dsp);
+    cout << "Did save file: " << "forecast_distribution.png" << endl;
+  }
+}
+
 void CCP::setUpRandomization()
 {
   cout << "\nSetUpRandomization()\n";
@@ -1123,4 +1233,35 @@ int CCP::getActionForMovement(int dx, int dy) {
   if( dx== 1 && dy== 1 ) return 8;
   else return 10000;
 }
+
+void CCP::colormap_CumilativeProb(Mat src, Mat &dst) {
+	if(src.type()!=CV_32FC1) cout << "ERROR(jetmap): must be single channel float\n";
+
+	Mat im;
+	src.copyTo(im);
+
+	double minVal = 1e-4;
+	double maxVal = 0.2;
+	threshold(im,im,minVal,0,THRESH_TOZERO);
+
+	im = (im-minVal)/(maxVal-minVal)*255.0;
+
+	Mat U8,I3[3],hsv;
+	im.convertTo(U8,CV_8UC1,1.0,0);
+	I3[0] = U8*1.0;									// Hue
+
+	Mat pU;
+	U8.convertTo(pU,CV_64F,-1.0/255.0,1.0);
+	pow(pU,0.5,pU);
+	pU.convertTo(U8,CV_8UC1,255.0,0);
+	I3[1] = U8*1.0;									// Saturation
+
+	Mat isNonZero;
+	compare(im,0,isNonZero,CMP_GT);
+	I3[2] = isNonZero;								// Value
+
+	merge(I3,3,hsv);
+	cvtColor(hsv,dst,CV_HSV2RGB_FULL);				// Convert to RGB
+}
+
 

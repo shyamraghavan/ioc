@@ -9,7 +9,7 @@ int main (int argc, char * const argv[])
   string demontraj_txt_path_prefix = "./ioc_demo/walk_traj/";
   string feat_maps_xml_path_prefix = "./ioc_demo/walk_feat/";
   string rect_imag_jpg_path_prefix = "./ioc_demo/walk_imag/";
-  string output_params_path        = "./ioc_demo/mohit_output/ccp_output_1/walk_reward_params.txt";
+  string output_params_path        = "./ioc_demo/walk_output/walk_reward_params.txt";
 
   CCP model;
 
@@ -20,10 +20,11 @@ int main (int argc, char * const argv[])
   model.loadImages      (rect_imag_jpg_path_prefix);
   //model.visualizeFeats  ();
 
-  model.readPolicy("./ioc_demo/mohit_output/ccp_output_1/policy.txt");
+  model.readPolicy("./ioc_demo/walk_output/policy.txt");
   //model.estimatePolicy(false);
   //model.savePolicy("./ioc_demo/mohit_output/ccp_output_1/policy.txt");
   model.estimateLikelihood();
+  model.computeStateVisDist();
 
   model.estimateGamma();
   model.estimateTransitionMatrix();
