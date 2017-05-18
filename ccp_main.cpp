@@ -5,11 +5,13 @@ using namespace std;
 int main (int argc, char * const argv[])
 {
 
+  string results_dir = "./ioc_demo/mohit_output/ccp_output";
+
   string basenames_txt_path        = "./ioc_demo/walk_basenames.txt";
   string demontraj_txt_path_prefix = "./ioc_demo/walk_traj/";
   string feat_maps_xml_path_prefix = "./ioc_demo/walk_feat/";
   string rect_imag_jpg_path_prefix = "./ioc_demo/walk_imag/";
-  string output_params_path        = "./ioc_demo/walk_output/walk_reward_params.txt";
+  string output_params_path        = results_dir + "/walk_reward_params.txt";
 
   CCP model;
 
@@ -20,23 +22,24 @@ int main (int argc, char * const argv[])
   model.loadImages      (rect_imag_jpg_path_prefix);
   //model.visualizeFeats  ();
 
-  model.readPolicy("./ioc_demo/walk_output/policy.txt");
-  //model.estimatePolicy(false);
-  //model.savePolicy("./ioc_demo/mohit_output/ccp_output_1/policy.txt");
+  //model.readPolicy("./ioc_demo/walk_output/policy.txt");
+  model.estimatePolicy(false);
+  model.savePolicy(results_dir + "/policy.txt");
   model.estimateLikelihood();
+  model.estimateTrajectory();
   model.computeStateVisDist();
 
   model.estimateGamma();
   model.estimateTransitionMatrix();
   model.estimateZeroValueFunction();
   model.estimateValueFunction();
-  model.saveValueFunction("./ioc_demo/mohit_output/ccp_output_1/valuefun.txt");
+  model.saveValueFunction(results_dir + "/valuefun.txt");
 
   //model.readValueFunction("./ioc_demo/walk_output/valuefun.txt");
   model.visualizeValueFunction();
 
   model.estimateRewardFunction();
-  model.saveRewardFunction("./ioc_demo/mohit_output/ccp_output_1/rewardfun.txt");
+  model.saveRewardFunction(results_dir + "/rewardfun.txt");
 
   //model.readRewardFunction("./ioc_demo/walk_output/rewardfun.txt");
   //model.saveTrueRewardFunction();

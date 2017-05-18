@@ -67,7 +67,10 @@ class CCP {
 
     void setUpRandomization               ();
     void getRandomPair                    (point_pair *result);
-    int  getActionForMovement        (int dx, int dy);
+    int  getActionForMovement             (int dx, int dy);
+    Point getMovementForAction            (int action);
+    void estimateTrajectory               ();
+    void reconstructTrajectory            (int d, Point start, Point end, vector<cv::Point> traj, vector<cv::Point> &estimatedTraj);
 
     static void estimatePolicyPoint           (CCP *i, void *arg);
     static void estimatePolicyPointSubsample  (CCP *i, void *arg);
